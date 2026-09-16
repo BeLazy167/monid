@@ -29,6 +29,11 @@ export const zRecordedCall = z.object({
     res: z.object({
         status: z.number().int(),
         body: zJson,
+        /** HAND-AUTHORED response headers (lower-cased keys) for chains
+         *  whose fns read HttpResult.headers. The RECORDER still never
+         *  captures headers (credential custody); a committed chain may
+         *  state the few SAFE ones a fn depends on. */
+        headers: z.record(z.string(), z.string()).optional(),
     }).strict(),
 }).strict();
 export type RecordedCall = z.infer<typeof zRecordedCall>;
@@ -81,7 +86,13 @@ export function trimJson(value: Json): Json {
 export function trimCalls(calls: RecordedCall[]): RecordedCall[] {
     return calls.map((call) => ({
         req: call.req,
-        res: { status: call.res.status, body: trimJson(call.res.body) },
+        res: {
+            status: call.res.status,
+            body: trimJson(call.res.body),
+            ...(call.res.headers !== undefined
+                ? { headers: call.res.headers }
+                : {}),
+        },
     }));
 }
 
@@ -128,7 +139,13 @@ export function scrubCalls(calls: RecordedCall[]): RecordedCall[] {
                 ? { body: scrubJson(call.req.body) }
                 : {}),
         },
-        res: { status: call.res.status, body: scrubJson(call.res.body) },
+        res: {
+            status: call.res.status,
+            body: scrubJson(call.res.body),
+            ...(call.res.headers !== undefined
+                ? { headers: call.res.headers }
+                : {}),
+        },
     }));
 }
 
@@ -179,7 +196,10 @@ export function replayFetch(
         return Promise.resolve(
             new Response(JSON.stringify(call.res.body), {
                 status: call.res.status,
-                headers: { "content-type": "application/json" },
+                headers: {
+                    "content-type": "application/json",
+                    ...call.res.headers,
+                },
             }),
         );
     };
