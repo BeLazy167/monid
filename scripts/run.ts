@@ -11,7 +11,15 @@
  * match, no escape hatch, no precedence rules).
  */
 import { Command } from "@cliffy/command";
-import { type Json, type RunInput, sealUnit } from "@shared/core";
+import { z } from "zod";
+import {
+    type Json,
+    parseSchema,
+    type ResourceRow,
+    type RunInput,
+    sealUnit,
+    zResourceRow,
+} from "@shared/core";
 import { directTransport, Engine } from "@monid/connector-engine";
 import { compileToOutput } from "./lib.ts";
 
@@ -35,6 +43,16 @@ const { options, args } = await new Command()
         "RunInput.queryParams (JSON object).",
     )
     .option("--path-params <json:string>", "RunInput.pathParams (JSON object).")
+    .option(
+        "--resources <file:string>",
+        "Owned-resource rows (a JSON file of ResourceRow[]) served to the " +
+            "ownership window. Bound endpoints run against an EMPTY " +
+            "window when omitted (foreign ids answer the uniform 404).",
+    )
+    .option(
+        "--scope-key <key:string>",
+        "The opaque scope token ensure fns see (default: local).",
+    )
     .parse(Deno.args);
 
 const endpointId = args[0];
@@ -68,9 +86,33 @@ console.error(
     } — loading ${endpointId}`,
 );
 
+// the CLI's ownership window: fixture rows from --resources, else empty
+// (bound endpoints still LOAD; ownership misses answer the uniform 404)
+const rows: ResourceRow[] = options.resources !== undefined
+    ? parseSchema(
+        z.array(zResourceRow),
+        JSON.parse(await Deno.readTextFile(options.resources)),
+        `--resources ${options.resources}`,
+    )
+    : [];
+
 const unit = sealUnit(bundle, endpointId);
-const engine = new Engine({ transport: directTransport() });
+const engine = new Engine({
+    transport: directTransport(),
+    resources: {
+        owned: (query) =>
+            Promise.resolve(
+                rows.filter((row) =>
+                    row.resource === query.resource &&
+                    (query.externalId === undefined ||
+                        row.externalId === query.externalId)
+                ),
+            ),
+    },
+    scopeKey: options.scopeKey ?? "local",
+});
 const loaded = await engine.load(unit);
+// run() executes ensure() inline first (v1 ordering) and logs its seeds
 const result = await loaded.run(input);
 
 console.log(JSON.stringify(result, null, 2));

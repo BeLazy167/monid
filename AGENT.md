@@ -23,6 +23,7 @@ migrated here change-by-change.
 
 ```
 connectors/<name>/            # provider.ts + endpoints/<e>/{endpoint.ts, schema/, endpoint.test.ts, fixtures/}
+                              #   + resources/<r>/resource.ts for OWNED billable things (saperly/phone-number)
 engine/                       # load -> link -> execute; transports; host ABI (ctx.utils)
 shared/core                   # THE contract: def/doc/hook/bundle zod schemas, presets
 shared/compiler               # pure Def -> Doc mapping, fn normalization + interning
@@ -190,9 +191,12 @@ The decision record (D-numbered) lives in `design.md` — read
 extending the schema or engine. `openspec/specs/` is populated on archive.
 
 The async run protocol (D10/D29's reserved surface) is IMPLEMENTED — see
-`openspec/changes/add-async-run-protocol/design.md`. Still reserved: resources
-(removed in D19), metered/accruing endpoints, declarative poll/stop phase arms,
-`stop` result reporting — "return with a concrete need, as their own change".
+`openspec/changes/add-async-run-protocol/design.md`. The RESOURCE LIFECYCLE
+(resources, endpoint bindings, accrue, stop outcomes, webhooks) is IMPLEMENTED
+too — see `openspec/changes/add-resource-lifecycle-saperly/design.md` (D30–D37;
+saperly is the proving connector: 17 endpoints + the `phone-number` resource;
+DEVELOPMENT.md "Resources" is the primer). Still reserved: declarative poll/stop
+phase arms, SUSPEND, catalog visibility.
 
 ## Conventions
 

@@ -2,110 +2,114 @@
 
 ## 1. Core schema — new resource family
 
-- [ ] 1.1 `shared/core/schema/resource/billing.ts` — `zResourceBilling`
+- [x] 1.1 `shared/core/schema/resource/billing.ts` — `zResourceBilling`
       (period w/ anchor, rent, variable w/ price card + holdCadenceMs +
       buffer + getActualCost carrier) + outcome schema
       `{consumes, vendorConsumes?}` + window shape.
-- [ ] 1.2 `shared/core/schema/resource/ops.ts` — op fn carriers + outcome
+- [x] 1.2 `shared/core/schema/resource/ops.ts` — op fn carriers + outcome
       schemas (check / release / refresh / external read) + shared op ctx
       (`{target, row, [window|args]}`).
-- [ ] 1.3 `shared/core/schema/resource/def.ts` + `define.ts` + `typed.ts` —
+- [x] 1.3 `shared/core/schema/resource/def.ts` + `define.ts` + `typed.ts` —
       `zResourceDef`, `defineResource` (generic over the `data` schema so
       ops/seeds are row-typed), ids (`zResourceId = <provider>/<name>`).
-- [ ] 1.4 `shared/core/schema/resource/doc.ts` — `zResourceDoc` +
+- [x] 1.4 `shared/core/schema/resource/doc.ts` — `zResourceDoc` +
       `resourceFnKeysOf`.
-- [ ] 1.5 `shared/core/schema/sections/resource-binding.ts` —
+- [x] 1.5 `shared/core/schema/sections/resource-binding.ts` —
       `zResourceBinding` (interaction enum, key JSONPath, seed/ensure
       carriers) + seed/ensure contracts in
       `shared/core/schema/hooks/resource-binding.ts`.
-- [ ] 1.6 `shared/core/schema/sections/webhooks.ts` +
+- [x] 1.6 `shared/core/schema/sections/webhooks.ts` +
       `hooks/webhooks.ts` — account/resource hook shapes (declarative
       verify descriptor; correlate/dispatch contracts; subscribe carrier).
-- [ ] 1.7 Wire into `zEndpointDef`/`zEndpointDoc` (`resource` binding, fn
+- [x] 1.7 Wire into `zEndpointDef`/`zEndpointDoc` (`resource` binding, fn
       refs, `fnKeysOf`), `zProviderDef`/doc (`webhooks`), bundle
       (`resources` map + closure), `mod.ts` exports.
 
 ## 2. Core schema — modifications
 
-- [ ] 2.1 `sections/usage.ts` — `accrue {intervalMs, counts, buffer?}` +
+- [x] 2.1 `sections/usage.ts` — `accrue {intervalMs, counts, buffer?}` +
       `hooks/accrue.ts` contract.
-- [ ] 2.2 `hooks/lifecycle.ts` — ctx `run: {runId}`; `LifecycleUtils.sleep`
+- [x] 2.2 `hooks/lifecycle.ts` — ctx `run: {runId}`; `LifecycleUtils.sleep`
       + `.resources` + (resource fns) `.external`; `HttpResult.headers`;
       stop outcome union (`void | Completed | UNRESOLVED`).
-- [ ] 2.3 `run/result.ts` — `RunCompleted.resources`,
-      `RunStartResult.ensured`, `zRunStopResult`.
-- [ ] 2.4 `json/util.ts` — `deepOmit` (+ engine impl + tests).
-- [ ] 2.5 `config.ts` — `schema.resources_since` fact.
+- [x] 2.3 `run/result.ts` — `RunCompleted.resources`, `zRunStopResult`.
+      (`RunStartResult.ensured` became the dedicated `ensure()` method —
+      hosts persist seeds BEFORE start as their own activity; run() calls
+      it inline.)
+- [x] 2.4 `json/util.ts` — deep-omit already shipped as `JsonUtil.omit`;
+      added the missing `str`/`optionalStr` pair instead (saperly's
+      forgiving string reads).
+- [x] 2.5 `config.ts` — `schema.resources_since` fact.
 
 ## 3. Compiler
 
-- [ ] 3.1 Discover + compile `resources/<name>/resource.ts`; fuse
+- [x] 3.1 Discover + compile `resources/<name>/resource.ts`; fuse
       auth/origin; intern fns; emit docs; extend bundle closure +
       determinism tests.
-- [ ] 3.2 Binding resolution + coherence (unknown resource, key/interaction
+- [x] 3.2 Binding resolution + coherence (unknown resource, key/interaction
       rules, seed/ensure placement, input-superset checks vs `inputs`,
       dead-binding lint).
-- [ ] 3.3 Billing coherence (variable ⇒ rent + release; cadence floor;
+- [x] 3.3 Billing coherence (variable ⇒ rent + release; cadence floor;
       accrue ⇒ poll; accrue keys ⊆ metered keys).
-- [ ] 3.4 `config.yml` facts + `scripts/version-check.ts` awareness;
+- [x] 3.4 `config.yml` facts + `scripts/version-check.ts` awareness;
       ENGINE_VERSION 0.1.0 → 0.2.0.
 
 ## 4. Engine
 
-- [ ] 4.1 `interfaces/mod.ts` — `ResourceReader`, `ResourceRow`, `RunCtx`,
+- [x] 4.1 `interfaces/mod.ts` — `ResourceReader`, `ResourceRow`, `RunCtx`,
       `LoadedResource`, result re-exports.
-- [ ] 4.2 Capability gating in `fn-utils.ts` (`resources` stub vs real;
+- [x] 4.2 Capability gating in `fn-utils.ts` (`resources` stub vs real;
       `sleep`; `external` for resource fns) + `transport.ts` headers
       passthrough.
-- [ ] 4.3 `engine.ts` — derived ownership gate (uniform 404), `ensure`
+- [x] 4.3 `engine.ts` — derived ownership gate (uniform 404), `ensure`
       phase (`RunStartResult.ensured`), post-settle derived outputs
       (`RunCompleted.resources`, PROVISION_CONSTRUCT), `accrued()`,
       stop-outcome handling, run-identity plumbing (ULID default).
-- [ ] 4.4 `loadResource` — link + gate + op runners (check/release/refresh/
+- [x] 4.4 `loadResource` — link + gate + op runners (check/release/refresh/
       external/actualCost) with outcome validation + error taxonomy
       (`RESOURCE_OP_FAILED`).
-- [ ] 4.5 `errors.ts` — the four new codes; engine unit tests for every
+- [x] 4.5 `errors.ts` — the four new codes; engine unit tests for every
       phase (gate hit/miss, ensure, seeds, accrued, stop outcomes,
       headers, reader gating).
 
 ## 5. Testing harness
 
-- [ ] 5.1 Fixture schema: top-level `resources` seeds + `res.headers`;
+- [x] 5.1 Fixture schema: top-level `resources` seeds + `res.headers`;
       fake ResourceReader in replay; instant sleep already covers
       `utils.sleep`.
-- [ ] 5.2 `testResource(id)` + op/actualCost/external fixture runners
+- [x] 5.2 `testResource(id)` + op/actualCost/external fixture runners
       (three window shapes).
-- [ ] 5.3 Webhook pure-fn test helpers.
+- [x] 5.3 Webhook pure-fn test helpers.
 
 ## 6. Saperly connector
 
-- [ ] 6.1 `connectors/saperly/provider.ts` (auth, credits, deepOmit
+- [x] 6.1 `connectors/saperly/provider.ts` (auth, credits, deepOmit
       projections, `number-events` webhook) + `schema/` (bodies + readers).
-- [ ] 6.2 `resources/phone-number/resource.ts` + fixtures + tests
+- [x] 6.2 `resources/phone-number/resource.ts` + fixtures + tests
       (check active/released/gone, release idempotency + connection
       delete, refresh override/carry-forward, external persona).
-- [ ] 6.3 Numbers: `provision-numbers` (saga + seed; fixtures: happy,
+- [x] 6.3 Numbers: `provision-numbers` (saga + seed; fixtures: happy,
       PriceChanged retry, degraded bind, malformed quote, purchase-fail
       orphan hygiene), `release-numbers/{id}`, `list-numbers`,
       `get-numbers/{id}`, `update-numbers/{id}` (repair branch),
       `sync-numbers`.
-- [ ] 6.4 Catalogs: `list-voices`, `list-languages`.
-- [ ] 6.5 Calls: `place-calls` (start/poll/stop + accrue; fixtures:
+- [x] 6.4 Catalogs: `list-voices`, `list-languages`.
+- [x] 6.5 Calls: `place-calls` (start/poll/stop + accrue; fixtures:
       born-terminal, running→settled, grace exhaustion, stop-settled,
       stop-UNRESOLVED), `inbound-calls` (adopt; shared poll/stop),
       `list-calls`, `get-calls/{id}`, `calls/{id}/transcript`,
       `calls/{id}/recording` (302 location).
-- [ ] 6.6 Messages: `send-messages`, `list-messages`, `inbound-messages`.
-- [ ] 6.7 Live tests gated `SAPERLY_API_KEY` (+ `SAPERLY_LIVE_SPEND=1` for
+- [x] 6.6 Messages: `send-messages`, `list-messages`, `inbound-messages`.
+- [x] 6.7 Live tests gated `SAPERLY_API_KEY` (+ `SAPERLY_LIVE_SPEND=1` for
       money cases, with teardown release); fixtures `synthetic-` until
       recorded.
 
 ## 7. CLI + docs + verification
 
-- [ ] 7.1 `scripts/run.ts --resources <file>`; `scripts/catalog.ts`
+- [x] 7.1 `scripts/run.ts --resources <file>`; `scripts/catalog.ts`
       resources listing + inspect.
-- [ ] 7.2 `DEVELOPMENT.md` chapters (resources, billing, bindings,
+- [x] 7.2 `DEVELOPMENT.md` chapters (resources, billing, bindings,
       webhooks, accrue) + `README.md` connector table row.
-- [ ] 7.3 Full verification: `deno task check && deno task test`;
+- [x] 7.3 Full verification: `deno task check && deno task test`;
       byte-identical recompile of every pre-existing connector;
       `deno task version:check`; `openspec validate --all` if available.

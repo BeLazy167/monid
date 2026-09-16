@@ -143,6 +143,70 @@ via `utils.money.fromDollars` (a `MonetaryValue`, micro-dollar canon);
 boilerplate). Not hiding, CONSOLIDATION: the same information should not appear
 twice in two shapes, identical for every operator.
 
+## Resources
+
+A **resource** is the durable, billable thing a provider can OWN on a
+workspace's behalf — a phone number, a mailbox, a VM (openspec:
+`add-resource-lifecycle-saperly`; saperly is the proving connector). A module
+beside endpoints with the same authoring → compile → sealed-unit pipeline:
+`connectors/<provider>/resources/<name>/resource.ts`, id `<provider>/<name>`
+inferred from the folder, compiled to a `zResourceDoc` in the bundle's
+`resources` map and executed via `engine.loadResource(unit)`.
+
+The def declares WHAT the resource is (`data` — the stored-row schema), what the
+PLATFORM may do unprompted (`ops.check` / `ops.release` / `ops.refresh` —
+effectful fns with the lifecycle posture: `utils.http` against the provider
+origin, throw = retriable `RESOURCE_OP_FAILED`), its always-live reads
+(`externals`, `display: true` = user-visible detail; billing and ops fns reach
+them via `utils.external(kind, args?)`, so the bill and the preview share ONE
+reader by construction), and how money flows while it exists (`billing`):
+
+- `period {unit, count, anchor}` — CREATION (rolling, the default) or CALENDAR
+  (UTC boundaries; the host pro-rates the first partial period).
+- `rent {consumes, chargeLeadMs, releaseLeadMs}` — a SET price per period,
+  charged in advance. Period 1 is charged by the CREATING run's own model;
+  `amount: 0` is a lawful free schedule (and how variable-only resources get
+  their clock). Sticky: the host charges max(card, the seed's observed
+  `rentConsumes`).
+- `variable {price, holdCadenceMs ≥ 1h, buffer, getActualCost}` — the dynamic
+  stream. `price` is a DISPLAY card; the bill is `getActualCost`'s answer over a
+  CUMULATIVE window `[periodStart, now)` — hold ticks, the boundary settle, and
+  the post-teardown tail all read the same meter. Coherence: variable ⇒ rent
+  (the period clock).
+
+What USERS do to a resource is ordinary ENDPOINTS, bound via ONE `resource:`
+block on the endpoint def: `{id, interaction, key?, seed?, ensure?}` with
+interaction ∈ CREATES / USES / UPDATES / RELEASES / READS. Everything derives
+from it: `key` (a JSONPath into the validated input) resolves the target and
+PRE-GATES ownership — a foreign id answers a uniform vendor-shaped 404 as data,
+zero usage, upstream untouched; a success settle emits `RunCompleted.resources`
+(`provisions` from the CREATES `seed` fn on the RAW envelope,
+`releases`/`refreshes`/`reconciles` targets for the others) — the host's
+persistence work-order. `ensure` (gated interactions) runs pre-start as its own
+activity: its seeds persist BEFORE the run executes, so a crash never orphans an
+upstream resource. A binding also unlocks `utils.resources.owned(...)` — the
+run-scoped ownership window served by the host's `ResourceReader` port
+(structurally withheld elsewhere: `RESOURCES_UNDECLARED`); loading a bound doc
+without a reader fails `NO_RESOURCE_READER`.
+
+Mid-run metering rides `usage.accrue {intervalMs, counts, buffer?}` (requires
+`lifecycle.poll`): `accrued(elapsedMs)` folds the counts fn + buffer through the
+doc's OWN rate card, so hosts grow the admission hold on a cadence and a live
+call can never outrun its hold. `stop()` grew a voice to match: a stop fn may
+return a full COMPLETED envelope (metered work SETTLES at stop — saperly's
+hangup), `UNRESOLVED` (host must reconcile before money settles), or void
+(`STOPPED_UNSETTLED`, the classic posture). Lifecycle fns also gained
+`ctx.data.run.runId` (host-stable — deterministic vendor idempotency keys),
+`utils.sleep(ms)` (bounded: 30 s/call, 120 s/phase), and response `headers` on
+`HttpResult` (saperly's 302 `location`).
+
+Webhooks are DECLARED on docs and EXECUTED by the host ingress: provider-level
+`webhooks.account[slug]` (and resource-level `webhooks`, where `subscribe` is
+required) carry a declarative HMAC `verify` descriptor plus pure `correlate`
+(WHO: resource / alias / run / unhandled) and `dispatch` (WHAT: `run` /
+`signal-run` / `refresh` / `ignore`) fns. No `subscribe` = manual registration —
+the host logs the callback URL to paste (saperly).
+
 ## Configuration
 
 Top-level `config.yml`, component-first
@@ -222,14 +286,15 @@ Why tag-triggered, why a GitHub Release:
 
 ## CLI reference
 
-| Task                                                                         | What                                                                                                 |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `deno task compiler:compile [--force] [--frozen-meta] [--publish <tag>]`     | compile EVERYTHING to `.output/catalog.json` (cached); `--publish` also emits the split publish tree |
-| `deno task catalog providers \| endpoints \| categories \| inspect <id>`     | browse compiled bundles (`--provider`/`--category` filters)                                          |
-| `deno task engine:run <id> [--body] [--query-params] [--path-params]`        | JIT compile + execute with env credentials (flags = `RunInput` fields, kebab-case)                   |
-| `deno task record <id> <scenario> [--body] [--query-params] [--path-params]` | fixture recorder: live call, {req,res} captured (headers dropped), written to fixtures/              |
-| `deno task test` / `test:live`                                               | replay tests (zero network) / live tests, auto-skipped without `<NAME>_API_KEY`                      |
-| `deno task check` / `lint` / `version:check`                                 | hygiene + contract guard                                                                             |
+| Task                                                                                                           | What                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `deno task compiler:compile [--force] [--frozen-meta] [--publish <tag>]`                                       | compile EVERYTHING to `.output/catalog.json` (cached); `--publish` also emits the split publish tree                         |
+| `deno task catalog providers \| endpoints \| categories \| inspect <id>`                                       | browse compiled bundles (`--provider`/`--category` filters)                                                                  |
+| `deno task catalog resources [--provider] \| inspect-resource <id>`                                            | browse compiled resource docs                                                                                                |
+| `deno task engine:run <id> [--body] [--query-params] [--path-params] [--resources <file>] [--scope-key <key>]` | JIT compile + execute with env credentials (flags = `RunInput` fields, kebab-case); `--resources` seeds the ownership window |
+| `deno task record <id> <scenario> [--body] [--query-params] [--path-params]`                                   | fixture recorder: live call, {req,res} captured (headers dropped), written to fixtures/                                      |
+| `deno task test` / `test:live`                                                                                 | replay tests (zero network) / live tests, auto-skipped without `<NAME>_API_KEY`                                              |
+| `deno task check` / `lint` / `version:check`                                                                   | hygiene + contract guard                                                                                                     |
 
 ## Authoring guide
 

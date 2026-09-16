@@ -3,7 +3,7 @@ import { fromFileUrl } from "@std/path";
 import { type Json, type ResourceRow, RunKind, StopKind } from "@shared/core";
 import { fnUtils } from "@monid/connector-engine";
 import {
-    fixtureReader,
+    liveSkip,
     loadEndpoint,
     loadFixture,
     runEndpoint,
@@ -650,4 +650,24 @@ Deno.test("saperly inbound-calls: adopts the event callId and shares the call li
     const stopped = await reloaded.stop(input, started.state, run);
     assert(stopped.kind === RunKind.COMPLETED);
     assertEquals(stopped.usage.credits, { default: 0.25 });
+});
+
+// ---------------------------------------------------------------------------
+// live (gated: SAPERLY_API_KEY; money cases additionally SAPERLY_LIVE_SPEND=1
+// — none automated here: provisioning + calls move real money and need a
+// teardown release; run them deliberately via `deno task engine:run`)
+// ---------------------------------------------------------------------------
+
+Deno.test({
+    name: "saperly live: list-voices answers the catalog",
+    ignore: liveSkip("saperly"),
+    fn: async () => {
+        const result = await runEndpoint({
+            unit: await testSealedUnit("saperly#list-voices"),
+            input: {},
+            mode: "live",
+        });
+        assertEquals(result.isProviderError, false);
+        assert(Array.isArray(result.output));
+    },
 });

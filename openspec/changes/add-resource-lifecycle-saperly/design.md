@@ -306,10 +306,27 @@ their call artifacts; the shared success+error `deepOmit` projection
 
 ## Versioning
 
-All additive; existing docs recompile byte-identical (acceptance-checked).
-`spec_version` 1.0.0 → 1.1.0 (new doc families/fields);
-`doc_format_since` → the new engine release (docs carrying new sections
-need it); `fn_abi_since` → the new engine release (ctx gained
-`run`/`sleep`/`resources`/`external`; HttpResult gained headers); new fact
-`schema.resources_since` stamps resource-op fn `api`; ENGINE_VERSION
-0.1.0 → 0.2.0. `deno task version:check` guards.
+All additive; existing docs recompile byte-identical (acceptance-checked
+against main — providers/endpoints/fnTable/taxonomy/minEngineVersion
+unchanged; only git provenance fields differ).
+
+RECONCILED AT IMPLEMENTATION (the original paragraph proposed bumping
+`spec_version`/`doc_format_since`/`fn_abi_since`, which is INCOMPATIBLE
+with the byte-identical acceptance scenario: all three are stamped into
+every existing doc/fn entry, so bumping any of them rewrites every doc's
+bytes and floors). What shipped instead:
+
+- `spec_version` stays 1.0.0 and `doc_format_since` stays 0.0.3: every
+  new doc field is optional, so old docs are untouched and old ENGINES
+  reject new-family docs anyway (their strictObject refuses the new keys
+  AND the 0.2.0 floor gates them).
+- `fn_abi_since` stays 0.1.0: the ABI additions (ctx `run`, `utils.sleep`
+  / `resources`, `HttpResult.headers`, the stop-outcome voice) are
+  strictly additive — an existing fn runs unchanged on the new engine.
+- NEW fact `schema.resources_since = 0.2.0` carries the whole family:
+  stamped as the `api` of every resource-family fn (ops, externals,
+  getActualCost, webhook fns, binding seed/ensure, accrue counts), the
+  floor of every resource doc, and an explicit `minEngineVersion` floor
+  for endpoint docs carrying a `resource` binding or `usage.accrue` even
+  when they add no new fn.
+- ENGINE_VERSION 0.1.0 → 0.2.0; `deno task version:check` guards.
