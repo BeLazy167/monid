@@ -1,0 +1,30 @@
+{
+    "name": "resource-external-connection",
+    "description": "The 'connection' external: the live sanitized persona - one reader for the preview surface.",
+    "calls": [
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/connections/conn-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "conn-1",
+                    "name": "Test persona",
+                    "mode": "hosted",
+                    "instructions": "Be helpful.",
+                    "language": "en",
+                    "tts": {
+                        "voiceId": "voice-1"
+                    },
+                    "llm": {
+                        "model": "openai/gpt-4o"
+                    },
+                    "complianceEnabled": true,
+                    "manualSecret": "sec-never-leaks"
+                }
+            }
+        }
+    ]
+}

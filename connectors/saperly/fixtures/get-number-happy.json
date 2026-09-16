@@ -1,0 +1,30 @@
+{
+    "name": "get-number-happy",
+    "description": "The row comes from the ownership window; ONE live read fetches the persona fresh. The raw connection (with its internal id + manualSecret) rides the fn output and the provider projection strips it to the public allowlist.",
+    "calls": [
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/connections/conn-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "conn-1",
+                    "name": "Test persona",
+                    "mode": "hosted",
+                    "instructions": "Be helpful.",
+                    "language": "en",
+                    "tts": {
+                        "voiceId": "voice-1"
+                    },
+                    "llm": {
+                        "model": "openai/gpt-4o"
+                    },
+                    "complianceEnabled": true,
+                    "manualSecret": "sec-never-leaks"
+                }
+            }
+        }
+    ]
+}

@@ -48,7 +48,10 @@ const stripSaperlyInternalKeys = (
                 omit(value: Json, keys: string[]): Json;
                 pick(value: Json, paths: string[]): Record<string, Json>;
                 merge(value: Json, fields: Record<string, Json>): Json;
-                optionalGet(value: Json, path: string): Json | undefined;
+                pluck(
+                    value: Json,
+                    path: string,
+                ): { value?: Json; rest: Json };
             };
         };
     },
@@ -68,14 +71,17 @@ const stripSaperlyInternalKeys = (
         "rateCentsPerMin",
         "costCents",
     ]);
-    const connection = $.optionalGet(out, "$.connection");
+    // pluck (exact removal), never a deep merge INTO the raw node — a
+    // merge would keep the internal `id` under the projected fields
+    const plucked = $.pluck(out, "$.connection");
+    const connection = plucked.value;
     if (
         connection !== undefined && connection !== null &&
         typeof connection === "object" && !Array.isArray(connection)
     ) {
         // A RAW connection response riding on a composed body becomes the
         // PUBLIC allowlist shape — never `id`/`manualSecret`/`mcpServers`.
-        out = $.merge(out, {
+        out = $.merge(plucked.rest, {
             connection: $.pick(connection, [
                 "$.name",
                 "$.mode",

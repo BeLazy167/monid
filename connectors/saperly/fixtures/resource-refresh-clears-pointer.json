@@ -1,0 +1,20 @@
+{
+    "name": "resource-refresh-clears-pointer",
+    "description": "ops.refresh with NO connectionId upstream: the AUTHORITATIVE pointer policy CLEARS the stored ref (a stale internal id must never survive); scalar fields carry forward on the degraded read.",
+    "calls": [
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/numbers/num-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "num-1",
+                    "country": "US",
+                    "numberType": "local"
+                }
+            }
+        }
+    ]
+}

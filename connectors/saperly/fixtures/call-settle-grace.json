@@ -1,0 +1,88 @@
+{
+    "name": "call-settle-grace",
+    "description": "The settle race (the 53s->'0 minutes' bug): a terminal STATUS with costCents still null keeps the run RUNNING on the deterministic graceLeft countdown; the third read settles and bills.",
+    "calls": [
+        {
+            "req": {
+                "method": "POST",
+                "url": "{{request.url}}",
+                "body": {
+                    "fromNumberId": "num-1",
+                    "to": "+14155550123"
+                }
+            },
+            "res": {
+                "status": 201,
+                "body": {
+                    "id": "call-1",
+                    "numberId": "num-1",
+                    "direction": "outbound",
+                    "to": "+14155550123",
+                    "from": "+14155559999",
+                    "status": "in-progress",
+                    "rateCentsPerMin": 26,
+                    "createdAt": "2026-09-16T01:00:00Z"
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/calls/call-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "call-1",
+                    "numberId": "num-1",
+                    "direction": "outbound",
+                    "to": "+14155550123",
+                    "from": "+14155559999",
+                    "status": "completed",
+                    "rateCentsPerMin": 26,
+                    "createdAt": "2026-09-16T01:00:00Z"
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/calls/call-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "call-1",
+                    "numberId": "num-1",
+                    "direction": "outbound",
+                    "to": "+14155550123",
+                    "from": "+14155559999",
+                    "status": "completed",
+                    "rateCentsPerMin": 26,
+                    "createdAt": "2026-09-16T01:00:00Z"
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "{{request.origin}}/calls/call-1"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "id": "call-1",
+                    "numberId": "num-1",
+                    "direction": "outbound",
+                    "to": "+14155550123",
+                    "from": "+14155559999",
+                    "status": "completed",
+                    "rateCentsPerMin": 26,
+                    "createdAt": "2026-09-16T01:00:00Z",
+                    "durationSec": 53,
+                    "costCents": 25
+                }
+            }
+        }
+    ]
+}

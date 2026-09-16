@@ -984,7 +984,8 @@ export class LoadedResource implements RunnableResource {
         private readonly logger: Logger,
     ) {}
 
-    check(row: ResourceRow): Promise<CheckOutcome> {
+    // deno-lint-ignore require-await
+    async check(row: ResourceRow): Promise<CheckOutcome> {
         const valid = this.parseRow(row);
         return this.fns.check(
             { target: this.targetOf(valid), row: valid },
@@ -992,7 +993,8 @@ export class LoadedResource implements RunnableResource {
         );
     }
 
-    release(row: ResourceRow): Promise<ReleaseOutcome> {
+    // deno-lint-ignore require-await
+    async release(row: ResourceRow): Promise<ReleaseOutcome> {
         const valid = this.parseRow(row);
         return this.fns.release(
             { target: this.targetOf(valid), row: valid },
@@ -1029,7 +1031,11 @@ export class LoadedResource implements RunnableResource {
         return outcome;
     }
 
-    actualCost(row: ResourceRow, window: ChargeWindow): Promise<ActualCost> {
+    // deno-lint-ignore require-await
+    async actualCost(
+        row: ResourceRow,
+        window: ChargeWindow,
+    ): Promise<ActualCost> {
         if (!this.fns.actualCost) {
             throw new EngineError(
                 EngineErrorCode.NOT_ASYNC,
@@ -1043,7 +1049,12 @@ export class LoadedResource implements RunnableResource {
         );
     }
 
-    external(kind: string, row: ResourceRow, args?: Json): Promise<Json> {
+    // deno-lint-ignore require-await
+    async external(
+        kind: string,
+        row: ResourceRow,
+        args?: Json,
+    ): Promise<Json> {
         const read = this.fns.externals[kind];
         if (!read) {
             throw new EngineError(

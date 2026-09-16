@@ -13,10 +13,15 @@ export {
     zFixture,
 } from "./fixtures.ts";
 export {
+    fixtureReader,
     liveSkip,
+    loadEndpoint,
+    loadResource,
+    type LoadResourceOptions,
     runEndpoint,
     type RunEndpointOptions,
     type RunMode,
     testBundle,
+    testResourceUnit,
     testSealedUnit,
 } from "./runner.ts";
