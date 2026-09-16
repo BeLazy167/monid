@@ -58,7 +58,10 @@ export const zResourceBindingSection = z.strictObject({
     key: z.string().min(1).optional(),
     /** CREATES-only (required there, forbidden elsewhere). */
     seed: zProvisionSeedFn.optional(),
-    /** Any interaction: pre-run prerequisites (v1 ensureResources). */
+    /** Gated interactions only: pre-run prerequisites (v1
+     *  ensureResources). FORBIDDEN on CREATES — the run itself IS the
+     *  provisioner there; a prerequisite that provisions belongs on the
+     *  endpoints that USE the resource. */
     ensure: zEnsureFn.optional(),
 }).superRefine((binding, ctx) => {
     if (binding.interaction === ResourceInteraction.CREATES) {
@@ -74,6 +77,14 @@ export const zResourceBindingSection = z.strictObject({
                 code: "custom",
                 path: ["key"],
                 message: "CREATES binding cannot take key (nothing to target)",
+            });
+        }
+        if (binding.ensure !== undefined) {
+            ctx.addIssue({
+                code: "custom",
+                path: ["ensure"],
+                message:
+                    "ensure is forbidden on CREATES — the run itself provisions",
             });
         }
     } else {

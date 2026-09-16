@@ -13,8 +13,12 @@ import {
     type Json,
     type LeafCategory,
     parseSchema,
+    type ProviderDef,
     type ProviderDoc,
     pruneUndefined,
+    type ResourceDef,
+    type ResourceDoc,
+    ResourceInteraction,
     stableStringify,
     ValidationError,
     zBundle,
@@ -25,6 +29,9 @@ import {
     zEndpointPath,
     zProviderDef,
     zProviderDoc,
+    zResourceDef,
+    zResourceDoc,
+    zResourceName,
 } from "@shared/core";
 import type { Logger } from "@shared/logging";
 import { FnInterner } from "./fns.ts";
@@ -187,7 +194,9 @@ export async function compileBundle(
     const interner = new FnInterner();
     const providers: Record<string, ProviderDoc> = {};
     const endpoints: Record<string, EndpointDoc> = {};
+    const resources: Record<string, ResourceDoc> = {};
     const allDocs: EndpointDoc[] = [];
+    const allResourceDocs: ResourceDoc[] = [];
 
     // intake validation — zod-first end to end even for hand-built sources
     const intake = connectors.map((connector) =>
@@ -205,6 +214,27 @@ export async function compileBundle(
         const providerName = provider.name;
         const providerFile = `connectors/${providerName}/provider.ts`;
         parseCategories(zCategories, provider.meta.categories, providerFile);
+
+        // ---- RESOURCES first (design D30): endpoint bindings resolve
+        // against this provider's compiled resource docs, so they must
+        // exist before the endpoint loop runs.
+        const providerResourceDocs: Record<string, ResourceDoc> = {};
+        const sortedResources = [...connector.resources ?? []]
+            .sort((a, b) => a.name.localeCompare(b.name)); // determinism
+        for (const { name: resourceName, def: rawDef } of sortedResources) {
+            const doc = await compileResource({
+                providerName,
+                providerFile,
+                provider,
+                resourceName,
+                rawDef,
+                interner,
+                logger,
+            });
+            providerResourceDocs[doc.id] = doc;
+            resources[doc.id] = doc;
+            allResourceDocs.push(doc);
+        }
 
         const providerEndpointDocs: EndpointDoc[] = [];
         // D6b: a PROVIDER-declared pool is a provider-wide fact — it must
@@ -672,6 +702,162 @@ export async function compileBundle(
                 const resolved = endpointSchema ?? providerSchema;
                 return resolved ? toJsonSchema(resolved, label) : undefined;
             };
+            const inputSchemas = {
+                body: schemaLeaf(
+                    def.input?.schema?.body,
+                    provider.input?.schema?.body,
+                    `${where}: input.schema.body`,
+                ),
+                queryParams: schemaLeaf(
+                    def.input?.schema?.queryParams,
+                    provider.input?.schema?.queryParams,
+                    `${where}: input.schema.queryParams`,
+                ),
+                pathParams: schemaLeaf(
+                    def.input?.schema?.pathParams,
+                    provider.input?.schema?.pathParams,
+                    `${where}: input.schema.pathParams`,
+                ),
+            };
+
+            // ---- usage.accrue: the mid-run curve (design D35) -------------
+            // Coherence: only a POLLABLE run has a mid-flight to price, and
+            // only METERED lines give the curve anything to say.
+            if (def.usage?.accrue) {
+                if (!lifecyclePoll) {
+                    throw new CompileError(
+                        CompileErrorCode.DOC_MALFORMED,
+                        `${where}: usage.accrue is dead config — no resolved ` +
+                            `lifecycle.poll (only a pollable run has a ` +
+                            `mid-flight to price)`,
+                    );
+                }
+                if (!metered) {
+                    throw new CompileError(
+                        CompileErrorCode.DOC_MALFORMED,
+                        `${where}: usage.accrue on a model with no metered ` +
+                            `lines — nothing accrues on a flat/free model`,
+                    );
+                }
+            }
+            const accrueCountsRef = def.usage?.accrue
+                ? await interner.intern(
+                    def.usage.accrue.counts,
+                    `${endpointFile}#usage.accrue.counts`,
+                    SC.resourcesSince,
+                )
+                : undefined;
+
+            // ---- resource binding (design D32) ----------------------------
+            const binding = def.resource;
+            let seedRef: FnRef | undefined;
+            let ensureRef: FnRef | undefined;
+            if (binding) {
+                // same-provider by construction: the binding is the
+                // endpoint's contract with ITS OWN provider's resource
+                if (!binding.id.startsWith(`${providerName}/`)) {
+                    throw new CompileError(
+                        CompileErrorCode.DOC_MALFORMED,
+                        `${where}: resource binding ${binding.id} names a ` +
+                            `foreign provider — bindings are same-provider ` +
+                            `(cross-provider reuse goes through ensure)`,
+                    );
+                }
+                const resourceDoc = providerResourceDocs[binding.id];
+                if (!resourceDoc) {
+                    throw new CompileError(
+                        CompileErrorCode.DOC_MALFORMED,
+                        `${where}: resource binding ${binding.id} matches no ` +
+                            `resources/<name>/resource.ts of this provider ` +
+                            `(compiled: ${
+                                Object.keys(providerResourceDocs).sort()
+                                    .join(", ") || "none"
+                            })`,
+                    );
+                }
+                // dead-binding lint: the ownership key must point INTO the
+                // declared input surface — a key no input can carry gates
+                // every run into the uniform 404.
+                if (binding.key !== undefined) {
+                    const match = binding.key.match(
+                        /^\$\.(body|queryParams|pathParams)\.([A-Za-z_][A-Za-z0-9_-]*)/,
+                    );
+                    if (!match) {
+                        throw new CompileError(
+                            CompileErrorCode.DOC_MALFORMED,
+                            `${where}: resource.key ${binding.key} must be ` +
+                                `rooted at $.body / $.queryParams / $.pathParams`,
+                        );
+                    }
+                    const section = inputSchemas[
+                        match[1] as keyof typeof inputSchemas
+                    ];
+                    const properties = (section?.properties ?? {}) as Record<
+                        string,
+                        Json
+                    >;
+                    if (!(match[2] in properties)) {
+                        throw new CompileError(
+                            CompileErrorCode.DOC_MALFORMED,
+                            `${where}: resource.key ${binding.key} is a DEAD ` +
+                                `binding — "${match[2]}" is not a property of ` +
+                                `the declared input.schema.${match[1]}`,
+                        );
+                    }
+                }
+                // input ⊇ inputs contract (design D30): the binding's
+                // interaction slot on the resource def is the CATALOG
+                // shape; the endpoint must be able to CARRY it.
+                const slotName = binding.interaction ===
+                        ResourceInteraction.CREATES
+                    ? "create"
+                    : binding.interaction === ResourceInteraction.UPDATES
+                    ? "update"
+                    : binding.interaction === ResourceInteraction.RELEASES
+                    ? "release"
+                    : undefined;
+                const slot = slotName
+                    ? resourceDoc.inputs?.[
+                        slotName as keyof typeof resourceDoc.inputs
+                    ]
+                    : undefined;
+                if (slot !== undefined) {
+                    const slotProps = Object.keys(
+                        (slot.properties ?? {}) as Record<string, Json>,
+                    );
+                    const bodyProps = new Set(Object.keys(
+                        (inputSchemas.body?.properties ?? {}) as Record<
+                            string,
+                            Json
+                        >,
+                    ));
+                    const missing = slotProps.filter((key) =>
+                        !bodyProps.has(key)
+                    );
+                    if (missing.length > 0) {
+                        throw new CompileError(
+                            CompileErrorCode.DOC_MALFORMED,
+                            `${where}: input.schema.body is not a superset ` +
+                                `of ${binding.id} inputs.${slotName} — ` +
+                                `missing: ${missing.join(", ")}`,
+                        );
+                    }
+                }
+                seedRef = binding.seed
+                    ? await interner.intern(
+                        binding.seed,
+                        `${endpointFile}#resource.seed`,
+                        SC.resourcesSince,
+                    )
+                    : undefined;
+                ensureRef = binding.ensure
+                    ? await interner.intern(
+                        binding.ensure,
+                        `${endpointFile}#resource.ensure`,
+                        SC.resourcesSince,
+                    )
+                    : undefined;
+            }
 
             // ---- minEngineVersion: AUTO-ONLY ------------------------------
             const refs = [
@@ -684,11 +870,18 @@ export async function compileBundle(
                 lifecycleStartRef,
                 lifecyclePollRef,
                 lifecycleStopRef,
+                accrueCountsRef,
+                seedRef,
+                ensureRef,
             ]
                 .filter((ref): ref is FnRef => ref !== undefined);
-            const minEngineVersion = semverMax(
-                refs.map((ref) => interner.table[ref.$fn.key].api),
-            );
+            const minEngineVersion = semverMax([
+                ...refs.map((ref) => interner.table[ref.$fn.key].api),
+                // a binding/accrue with no NEW fn (e.g. USES with neither
+                // seed nor ensure) still floors the doc: an older engine's
+                // strictObject rejects the new keys outright.
+                ...(binding || def.usage?.accrue ? [SC.resourcesSince] : []),
+            ]);
 
             // ---- assemble + validate --------------------------------------
             const docWithoutHash = pruneUndefined({
@@ -711,21 +904,9 @@ export async function compileBundle(
                 },
                 input: {
                     schema: {
-                        body: schemaLeaf(
-                            def.input?.schema?.body,
-                            provider.input?.schema?.body,
-                            `${where}: input.schema.body`,
-                        ),
-                        queryParams: schemaLeaf(
-                            def.input?.schema?.queryParams,
-                            provider.input?.schema?.queryParams,
-                            `${where}: input.schema.queryParams`,
-                        ),
-                        pathParams: schemaLeaf(
-                            def.input?.schema?.pathParams,
-                            provider.input?.schema?.pathParams,
-                            `${where}: input.schema.pathParams`,
-                        ),
+                        body: inputSchemas.body,
+                        queryParams: inputSchemas.queryParams,
+                        pathParams: inputSchemas.pathParams,
                     },
                     toRequest: toRequestRef as unknown as Json,
                 },
@@ -744,6 +925,14 @@ export async function compileBundle(
                     estimate: estimateRef as unknown as Json,
                     evidence: evidenceRef as unknown as Json,
                     consolidate: consolidateRef as unknown as Json,
+                    accrue: def.usage?.accrue
+                        ? {
+                            intervalMs: def.usage.accrue.intervalMs,
+                            counts: accrueCountsRef as unknown as Json,
+                            buffer: def.usage.accrue
+                                .buffer as unknown as Json,
+                        }
+                        : undefined,
                 },
                 lifecycle: lifecycleStartRef
                     ? {
@@ -751,6 +940,15 @@ export async function compileBundle(
                         poll: lifecyclePollRef as unknown as Json,
                         stop: lifecycleStopRef as unknown as Json,
                         stateSchema: stateSchema as unknown as Json,
+                    }
+                    : undefined,
+                resource: binding
+                    ? {
+                        id: binding.id,
+                        interaction: binding.interaction,
+                        key: binding.key,
+                        seed: seedRef as unknown as Json,
+                        ensure: ensureRef as unknown as Json,
                     }
                     : undefined,
                 timeouts,
@@ -797,14 +995,62 @@ export async function compileBundle(
             }
         }
 
-        // ---- ProviderDoc: identity + display only (nothing derivable) -----
+        // ---- provider webhooks (design D36): account-scope hooks ----------
+        let webhooksDoc: Record<string, Json> | undefined;
+        if (provider.webhooks) {
+            const account: Record<string, Json> = {};
+            for (
+                const [slug, hook] of Object.entries(
+                    provider.webhooks.account,
+                ).sort(([a], [b]) => a.localeCompare(b))
+            ) {
+                const label = `${providerFile}#webhooks.account.${slug}`;
+                account[slug] = pruneUndefined({
+                    verify: hook.verify as unknown as Json,
+                    correlate: await interner.intern(
+                        hook.correlate,
+                        `${label}.correlate`,
+                        SC.resourcesSince,
+                    ) as unknown as Json,
+                    dispatch: await interner.intern(
+                        hook.dispatch,
+                        `${label}.dispatch`,
+                        SC.resourcesSince,
+                    ) as unknown as Json,
+                    subscribe: hook.subscribe
+                        ? await interner.intern(
+                            hook.subscribe,
+                            `${label}.subscribe`,
+                            SC.resourcesSince,
+                        ) as unknown as Json
+                        : undefined,
+                    unsubscribe: hook.unsubscribe
+                        ? await interner.intern(
+                            hook.unsubscribe,
+                            `${label}.unsubscribe`,
+                            SC.resourcesSince,
+                        ) as unknown as Json
+                        : undefined,
+                }) as Record<string, Json>;
+            }
+            webhooksDoc = { account };
+        }
+
+        // ---- ProviderDoc: identity + display (+ webhooks, the one
+        // fn-bearing section) — minEngineVersion is the max over the
+        // provider's WHOLE family: endpoints, resources, webhook fns.
         const providerWithoutHash = pruneUndefined({
             specVersion: SC.specVersion,
             name: providerName,
-            minEngineVersion: semverMax(
-                providerEndpointDocs.map((doc) => doc.minEngineVersion),
-            ),
+            minEngineVersion: semverMax([
+                ...providerEndpointDocs.map((doc) => doc.minEngineVersion),
+                ...Object.values(providerResourceDocs).map((doc) =>
+                    doc.minEngineVersion
+                ),
+                ...(provider.webhooks ? [SC.resourcesSince] : []),
+            ]),
             meta: provider.meta as unknown as Json,
+            webhooks: webhooksDoc as unknown as Json,
         }) as Record<string, Json>;
         providers[providerName] = parseDoc(zProviderDoc, {
             ...providerWithoutHash,
@@ -824,13 +1070,19 @@ export async function compileBundle(
     const bundle = parseDoc(zBundle, {
         catalogVersion: opts.catalogVersion,
         generatedAt: opts.generatedAt,
-        minEngineVersion: semverMax(allDocs.map((doc) => doc.minEngineVersion)),
+        minEngineVersion: semverMax([
+            ...allDocs.map((doc) => doc.minEngineVersion),
+            ...allResourceDocs.map((doc) => doc.minEngineVersion),
+        ]),
         toolchain: {
             compilerVersion: opts.compilerVersion,
             builtWithEngineVersion: opts.builtWithEngineVersion,
         },
         providers,
         endpoints,
+        // ABSENT (not {}) when no provider declares one — the
+        // pre-resource bundle stays byte-identical.
+        ...(allResourceDocs.length > 0 ? { resources } : {}),
         taxonomy: {
             leaves: [...opts.leafCategories],
             membership: Object.fromEntries(
@@ -843,6 +1095,230 @@ export async function compileBundle(
     }, "compiled bundle");
     assertPureJson(bundle, "bundle");
     return bundle;
+}
+
+/**
+ * Compile ONE resource def → zResourceDoc (design D30). Resources fuse
+ * their PROVIDER's execution identity (auth inject + credential shape,
+ * request origin, request timeout) — a resource def declares none of it,
+ * so a provider hosting resources MUST resolve auth.inject and
+ * request.baseUrl at the provider level. Every fn stamps
+ * `schema.resources_since` (the resource family IS the surface).
+ */
+async function compileResource(args: {
+    providerName: string;
+    providerFile: string;
+    provider: ProviderDef;
+    resourceName: string;
+    rawDef: unknown;
+    interner: FnInterner;
+    logger?: Logger;
+}): Promise<ResourceDoc> {
+    const { providerName, providerFile, provider, resourceName, interner } =
+        args;
+    parseDoc(
+        zResourceName,
+        resourceName,
+        `connectors/${providerName}/resources/${resourceName} (folder name)`,
+    );
+    const where = `connectors/${providerName}/resources/${resourceName}`;
+    const resourceFile = `${where}/resource.ts`;
+    const def = parseDoc(zResourceDef, args.rawDef, resourceFile);
+    const id = `${providerName}/${resourceName}`;
+
+    // ---- fused provider identity (no resource-level overrides) ----------
+    const inject = provider.auth?.inject;
+    if (!inject) {
+        throw new CompileError(
+            CompileErrorCode.HOOK_UNRESOLVED,
+            `${where}: provider auth.inject must resolve — resources run ` +
+                `under the provider's identity (declare it in ${providerFile})`,
+        );
+    }
+    const injectRef = await interner.intern(
+        inject,
+        `${providerFile}#auth.inject`,
+        SC.fnAbiSince,
+    );
+    const credentialsSchema = toJsonSchema(
+        provider.auth?.credentials ?? zDefaultCredentials,
+        `${where}: auth.credentials`,
+    );
+    const baseUrl = provider.request?.baseUrl;
+    if (baseUrl === undefined) {
+        throw new CompileError(
+            CompileErrorCode.DOC_MALFORMED,
+            `${where}: provider request.baseUrl must resolve — resource ops ` +
+                `target the provider origin (declare it in ${providerFile})`,
+        );
+    }
+    const parsedBase = new URL(baseUrl);
+    if (parsedBase.search !== "" || parsedBase.hash !== "") {
+        throw new CompileError(
+            CompileErrorCode.DOC_MALFORMED,
+            `${where}: baseUrl must not contain a query string or fragment`,
+        );
+    }
+    const url = new URL(baseUrl.replace(/[?#]*$/, "").replace(/\/+$/, ""))
+        .toString().replace(/\/+$/, "");
+
+    // ---- meta: same leaf rules as endpoints (docsUrl fallback, notes
+    // provider-then-resource concatenation) ------------------------------
+    const notes = [
+        ...provider.meta.notes ?? [],
+        ...def.meta.notes ?? [],
+    ];
+    const meta = pruneUndefined({
+        ...def.meta,
+        docsUrl: def.meta.docsUrl ?? provider.meta.docsUrl,
+        notes: notes.length > 0 ? notes : undefined,
+    } as unknown as Json);
+
+    // ---- schemas ---------------------------------------------------------
+    const dataSchema = toJsonSchema(def.data, `${where}: data`);
+    const inputs = def.inputs
+        ? pruneUndefined({
+            create: def.inputs.create
+                ? toJsonSchema(def.inputs.create, `${where}: inputs.create`)
+                : undefined,
+            update: def.inputs.update
+                ? toJsonSchema(def.inputs.update, `${where}: inputs.update`)
+                : undefined,
+            release: def.inputs.release
+                ? toJsonSchema(def.inputs.release, `${where}: inputs.release`)
+                : undefined,
+        }) as Record<string, Json>
+        : undefined;
+
+    // ---- fns: ops + billing meter + externals + webhooks ----------------
+    const checkRef = await interner.intern(
+        def.ops.check,
+        `${resourceFile}#ops.check`,
+        SC.resourcesSince,
+    );
+    const releaseRef = await interner.intern(
+        def.ops.release,
+        `${resourceFile}#ops.release`,
+        SC.resourcesSince,
+    );
+    const refreshRef = def.ops.refresh
+        ? await interner.intern(
+            def.ops.refresh,
+            `${resourceFile}#ops.refresh`,
+            SC.resourcesSince,
+        )
+        : undefined;
+    const billing = def.billing
+        ? pruneUndefined({
+            period: def.billing.period as unknown as Json,
+            rent: def.billing.rent as unknown as Json,
+            variable: def.billing.variable
+                ? {
+                    price: def.billing.variable.price as unknown as Json,
+                    holdCadenceMs: def.billing.variable.holdCadenceMs,
+                    buffer: def.billing.variable.buffer as unknown as Json,
+                    getActualCost: await interner.intern(
+                        def.billing.variable.getActualCost,
+                        `${resourceFile}#billing.variable.getActualCost`,
+                        SC.resourcesSince,
+                    ) as unknown as Json,
+                }
+                : undefined,
+        }) as Record<string, Json>
+        : undefined;
+    const externals: Record<string, Json> = {};
+    for (
+        const [kind, external] of Object.entries(def.externals ?? {})
+            .sort(([a], [b]) => a.localeCompare(b))
+    ) {
+        externals[kind] = {
+            read: await interner.intern(
+                external.read,
+                `${resourceFile}#externals.${kind}`,
+                SC.resourcesSince,
+            ) as unknown as Json,
+            display: external.display,
+        };
+    }
+    const webhooks: Record<string, Json> = {};
+    for (
+        const [slug, hook] of Object.entries(def.webhooks ?? {})
+            .sort(([a], [b]) => a.localeCompare(b))
+    ) {
+        const label = `${resourceFile}#webhooks.${slug}`;
+        webhooks[slug] = pruneUndefined({
+            verify: hook.verify as unknown as Json,
+            correlate: await interner.intern(
+                hook.correlate,
+                `${label}.correlate`,
+                SC.resourcesSince,
+            ) as unknown as Json,
+            dispatch: await interner.intern(
+                hook.dispatch,
+                `${label}.dispatch`,
+                SC.resourcesSince,
+            ) as unknown as Json,
+            subscribe: await interner.intern(
+                hook.subscribe,
+                `${label}.subscribe`,
+                SC.resourcesSince,
+            ) as unknown as Json,
+            unsubscribe: hook.unsubscribe
+                ? await interner.intern(
+                    hook.unsubscribe,
+                    `${label}.unsubscribe`,
+                    SC.resourcesSince,
+                ) as unknown as Json
+                : undefined,
+        }) as Record<string, Json>;
+    }
+
+    // ---- assemble --------------------------------------------------------
+    const docWithoutHash = pruneUndefined({
+        specVersion: SC.specVersion,
+        id,
+        provider: providerName,
+        // the family floor rides in explicitly: a minimal resource doc
+        // (default-credential provider) might otherwise carry only
+        // fnAbiSince-stamped inject
+        minEngineVersion: semverMax([SC.resourcesSince]),
+        meta,
+        data: { schema: dataSchema },
+        inputs: inputs && Object.keys(inputs).length > 0 ? inputs : undefined,
+        billing,
+        ops: {
+            check: checkRef as unknown as Json,
+            release: releaseRef as unknown as Json,
+            refresh: refreshRef as unknown as Json,
+        },
+        externals: Object.keys(externals).length > 0 ? externals : undefined,
+        webhooks: Object.keys(webhooks).length > 0 ? webhooks : undefined,
+        auth: {
+            inject: injectRef as unknown as Json,
+            credentials: credentialsSchema,
+        },
+        request: { url },
+        timeouts: {
+            requestMs: provider.timeouts?.requestMs ??
+                CC.defaultTimeouts.requestMs,
+        },
+    }) as Record<string, Json>;
+
+    const hash = await docHash(docWithoutHash);
+    const doc = parseDoc(zResourceDoc, { ...docWithoutHash, hash }, where);
+
+    const size = stableStringify(docWithoutHash).length;
+    if (size > CC.docSizeFailBytes) {
+        throw new CompileError(
+            CompileErrorCode.DOC_MALFORMED,
+            `${where}: doc size ${size} > ${CC.docSizeFailBytes}`,
+        );
+    }
+    if (size > CC.docSizeWarnBytes) {
+        args.logger?.warn(`doc size over warn threshold`, { where, size });
+    }
+    assertPureJson(doc, `${where} compiled doc`);
+    return doc;
 }
 
 function parseCategories(
