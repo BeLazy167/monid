@@ -800,7 +800,9 @@ export async function compileBundle(
                         throw new CompileError(
                             CompileErrorCode.DOC_MALFORMED,
                             `${where}: resource.key ${binding.key} is a DEAD ` +
-                                `binding — "${match[2]}" is not a property of ` +
+                                `binding — "${
+                                    match[2]
+                                }" is not a property of ` +
                                 `the declared input.schema.${match[1]}`,
                         );
                     }
@@ -822,16 +824,23 @@ export async function compileBundle(
                     ]
                     : undefined;
                 if (slot !== undefined) {
-                    const slotProps = Object.keys(
-                        (slot.properties ?? {}) as Record<string, Json>,
-                    );
+                    // the slot's REQUIRED properties are the contract an
+                    // endpoint must be able to CARRY; optional slot keys
+                    // are per-endpoint (two UPDATES endpoints may take
+                    // different optional surfaces — saperly's persona
+                    // edit vs its webhook re-sync)
+                    const slotRequired = Array.isArray(slot.required)
+                        ? slot.required.filter((key): key is string =>
+                            typeof key === "string"
+                        )
+                        : [];
                     const bodyProps = new Set(Object.keys(
                         (inputSchemas.body?.properties ?? {}) as Record<
                             string,
                             Json
                         >,
                     ));
-                    const missing = slotProps.filter((key) =>
+                    const missing = slotRequired.filter((key) =>
                         !bodyProps.has(key)
                     );
                     if (missing.length > 0) {
@@ -839,7 +848,7 @@ export async function compileBundle(
                             CompileErrorCode.DOC_MALFORMED,
                             `${where}: input.schema.body is not a superset ` +
                                 `of ${binding.id} inputs.${slotName} — ` +
-                                `missing: ${missing.join(", ")}`,
+                                `missing required: ${missing.join(", ")}`,
                         );
                     }
                 }

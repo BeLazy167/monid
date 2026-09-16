@@ -50,11 +50,14 @@ export const zResourceBindingSection = z.strictObject({
     id: zResourceId,
     interaction: zResourceInteraction,
     /** JSONPath into the VALIDATED input naming the externalId the run
-     *  targets (e.g. `$.body.from`) — REQUIRED for the gated
-     *  interactions (USES/UPDATES/RELEASES/READS), FORBIDDEN for
-     *  CREATES (nothing exists yet to target). The engine resolves it
-     *  and pre-gates: not owned ⇒ the uniform vendor-shaped 404 AS DATA,
-     *  zero usage, upstream never touched. */
+     *  targets (e.g. `$.body.from`) — REQUIRED for UPDATES/RELEASES
+     *  (their settle marks need a target), OPTIONAL for USES/READS (an
+     *  ANCHOR endpoint derives ownership in-fn via `utils.resources` —
+     *  saperly's call artifacts; a pure reader serves from the reader
+     *  alone — list-numbers), FORBIDDEN for CREATES (nothing exists yet
+     *  to target). When present the engine resolves it and pre-gates:
+     *  not owned ⇒ the uniform vendor-shaped 404 AS DATA, zero usage,
+     *  upstream never touched. */
     key: z.string().min(1).optional(),
     /** CREATES-only (required there, forbidden elsewhere). */
     seed: zProvisionSeedFn.optional(),
@@ -88,12 +91,16 @@ export const zResourceBindingSection = z.strictObject({
             });
         }
     } else {
-        if (binding.key === undefined) {
+        if (
+            binding.key === undefined &&
+            (binding.interaction === ResourceInteraction.UPDATES ||
+                binding.interaction === ResourceInteraction.RELEASES)
+        ) {
             ctx.addIssue({
                 code: "custom",
                 path: ["key"],
                 message:
-                    `${binding.interaction} binding requires key (the ownership gate)`,
+                    `${binding.interaction} binding requires key (its settle mark needs a target)`,
             });
         }
         if (binding.seed !== undefined) {

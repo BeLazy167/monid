@@ -240,15 +240,14 @@ Why tag-triggered, why a GitHub Release:
   capability text (inspect/agents); `notes` = operational CAVEATS, one
   standalone fact per entry (latency, result expiry, input shapes the vendor
   rejects, parameter combinations that are silently wrong rather than errors).
-  `notes` is the ONE additive leaf: the compiled doc concatenates the
-  provider's then the endpoint's, so a provider states what is true of all its
-  endpoints and each endpoint states only what diverges. It is also where a
-  cross-field rule goes, since `.refine`/`.superRefine` cannot survive
-  compilation. A constraint about ONE field stays on that field's
-  `.describe()`. Categories: add the leaf to `connectors/categories.ts` in the
-  same PR.
-- **Schemas**: endpoint-local zod at `endpoints/<name>/schema/inputs.ts` —
-  only what that endpoint uses; a fragment two endpoints share goes in
+  `notes` is the ONE additive leaf: the compiled doc concatenates the provider's
+  then the endpoint's, so a provider states what is true of all its endpoints
+  and each endpoint states only what diverges. It is also where a cross-field
+  rule goes, since `.refine`/`.superRefine` cannot survive compilation. A
+  constraint about ONE field stays on that field's `.describe()`. Categories:
+  add the leaf to `connectors/categories.ts` in the same PR.
+- **Schemas**: endpoint-local zod at `endpoints/<name>/schema/inputs.ts` — only
+  what that endpoint uses; a fragment two endpoints share goes in
   `connectors/<name>/schema/`, never imported or re-exported across endpoint
   directories, and never across providers. What the engine enforces is the
   COMPILED JSON Schema, so the test is whether `z.toJSONSchema` can express the
@@ -259,10 +258,9 @@ Why tag-triggered, why a GitHub Release:
   CROSS-field rule has to be documented in `notes` instead. Do not read that as
   "validation does not survive": a single-field constraint belongs in the
   schema, where it is enforced before the wire. Write `.describe()` BEFORE
-  `.optional()`:
-  a binding that derives a field with `.unwrap()` keeps only the inner schema,
-  so a describe hung on the optional wrapper is silently dropped from the
-  compiled doc (the compiler does not check for it).
+  `.optional()`: a binding that derives a field with `.unwrap()` keeps only the
+  inner schema, so a describe hung on the optional wrapper is silently dropped
+  from the compiled doc (the compiler does not check for it).
 - **Fixtures**: recorded via `deno task record` (headers never captured);
   synthetic fixtures carry a `synthetic-` prefix until real keys exist.
 

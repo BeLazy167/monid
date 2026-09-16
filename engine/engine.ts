@@ -841,10 +841,14 @@ export class LoadedEndpoint implements RunnableEndpoint {
         }
         // D32 settle marks — SUCCESS only (a failed run neither
         // provisions nor releases); derived from the binding's
-        // interaction, the host's persistence work-order.
+        // interaction, the host's persistence work-order. The seed fn
+        // reads the RAW envelope (like evidence — provision anchors to
+        // the wire): the user-facing fromResponse projection strips
+        // exactly the internals a provision needs (vendor ids, quoted
+        // prices).
         const resources = isProviderError
             ? undefined
-            : this.deriveEffects(input, output, state, target);
+            : this.deriveEffects(input, raw, state, target);
         // flat, kind-discriminated (no nested result to unwrap)
         return {
             kind: RunKind.COMPLETED,
@@ -862,7 +866,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
     }
 
     /** The binding's settle-side derivation (design D32): CREATES runs
-     *  the seed fn on the FINAL envelope; the gated interactions mark
+     *  the seed fn on the RAW envelope; the gated interactions mark
      *  their resolved target. READS marks nothing. */
     private deriveEffects(
         input: RunInput,

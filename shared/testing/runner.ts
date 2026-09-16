@@ -6,8 +6,8 @@ import {
     type ResourceRow,
     type ResourceSealedUnit,
     type RunInput,
-    sealResourceUnit,
     type SealedUnit,
+    sealResourceUnit,
     sealUnit,
 } from "@shared/core";
 import {
@@ -72,11 +72,13 @@ export async function testResourceUnit(
 export function fixtureReader(rows: ResourceRow[] = []): ResourceReader {
     return {
         owned: (query) =>
-            Promise.resolve(rows.filter((row) =>
-                row.resource === query.resource &&
-                (query.externalId === undefined ||
-                    row.externalId === query.externalId)
-            )),
+            Promise.resolve(
+                rows.filter((row) =>
+                    row.resource === query.resource &&
+                    (query.externalId === undefined ||
+                        row.externalId === query.externalId)
+                ),
+            ),
     };
 }
 

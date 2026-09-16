@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { contractConfig } from "../../config.ts";
-import {
-    zDocHash,
-    zProviderName,
-    zSemverString,
-} from "../common/ids.ts";
+import { zDocHash, zProviderName, zSemverString } from "../common/ids.ts";
 import { zBaseMeta } from "../meta/base.ts";
 import { zJsonSchemaDoc } from "../endpoint/json-schema-doc.ts";
 import { zFnRef } from "../fn-table/ref.ts";

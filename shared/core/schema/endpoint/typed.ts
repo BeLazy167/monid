@@ -19,6 +19,7 @@ import type { Json } from "../json/type.ts";
 import type { FnUtils, HookLogger } from "../hooks/ctx.ts";
 import type {
     LifecycleRequestInfo,
+    LifecycleRunInfo,
     LifecycleUtils,
 } from "../hooks/lifecycle.ts";
 import type { RunInput } from "../run/input.ts";
@@ -120,6 +121,7 @@ export interface TypedLifecycleStartCtx<
     data: {
         input: TypedRunInput<B, Q>;
         request: LifecycleRequestInfo;
+        run: LifecycleRunInfo;
     };
     utils: LifecycleUtils;
     logger: HookLogger;
@@ -133,6 +135,7 @@ export interface TypedLifecycleTickCtx<
     data: {
         input: TypedRunInput<B, Q>;
         request: LifecycleRequestInfo;
+        run: LifecycleRunInfo;
         lifecycle: { state: TypedRunState<SD> };
     };
     utils: LifecycleUtils;
@@ -172,9 +175,23 @@ export type TypedLifecycleSlots<B, StateSchema extends z.ZodType, Seed> =
         poll?: (
             ctx: TypedLifecycleTickCtx<B, z.output<StateSchema>>,
         ) => Promise<TypedLifecycleOutcome<z.output<StateSchema>>>;
+        /** Stop with a voice (design D34): a full COMPLETED envelope
+         *  settles the metered work, UNRESOLVED flags for host
+         *  reconciliation, void keeps the classic best-effort posture. */
         stop?: (
             ctx: TypedLifecycleTickCtx<B, z.output<StateSchema>>,
-        ) => Promise<void>;
+        ) => Promise<
+            | Extract<
+                TypedLifecycleOutcome<z.output<StateSchema>>,
+                { kind: "COMPLETED" }
+            >
+            | {
+                kind: "UNRESOLVED";
+                reason?: string;
+                state?: TypedFnState<z.output<StateSchema>>;
+            }
+            | void
+        >;
     };
 
 export type TypedOutputSlots<B, SD, Seed> =

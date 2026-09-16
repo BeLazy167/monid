@@ -142,4 +142,20 @@ export const LEAF_CATEGORIES = defineLeafCategories([
             "Generate video from a text prompt, a still image, or reference " +
             "clips.",
     },
+    {
+        // The first RESOURCE-backed leaf (add-resource-lifecycle-saperly):
+        // real phone numbers owned by the workspace, with AI personas
+        // answering and placing calls.
+        id: "agentic-phone",
+        displayName: "Agentic Phone",
+        description:
+            "Real phone numbers for AI agents — provision numbers, place " +
+            "and answer calls with an AI persona, transcripts and " +
+            "recordings.",
+    },
+    {
+        id: "sms",
+        displayName: "SMS",
+        description: "Send and receive SMS from owned phone numbers.",
+    },
 ]);

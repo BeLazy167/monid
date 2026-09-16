@@ -160,6 +160,33 @@ export const jsonUtil: JsonUtil = {
         }
         return found;
     },
+    str: (value, path) => {
+        const found = lookup(value, path);
+        if (found === undefined) {
+            throw new JsonPathError(
+                "PATH_NOT_FOUND",
+                `json.str: nothing at ${path} (use optionalStr if absence is expected)`,
+            );
+        }
+        if (typeof found !== "string" || found.length === 0) {
+            throw new JsonPathError(
+                "TYPE_MISMATCH",
+                `json.str: value at ${path} is not a non-empty string`,
+            );
+        }
+        return found;
+    },
+    optionalStr: (value, path) => {
+        const found = lookup(value, path);
+        if (found === undefined) return undefined;
+        if (typeof found !== "string") {
+            throw new JsonPathError(
+                "TYPE_MISMATCH",
+                `json.optionalStr: value at ${path} is not a string`,
+            );
+        }
+        return found.length === 0 ? undefined : found;
+    },
     len: (value, path) => {
         const found = lookup(value, path);
         if (found === undefined) {

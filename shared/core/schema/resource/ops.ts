@@ -1,10 +1,7 @@
 import { z } from "zod";
 import { type Json, zJson } from "../json/type.ts";
 import { fnCarrier, type FnUtils, type HookLogger } from "../hooks/ctx.ts";
-import type {
-    LifecycleHttpFn,
-    LifecycleSleepFn,
-} from "../hooks/lifecycle.ts";
+import type { LifecycleHttpFn, LifecycleSleepFn } from "../hooks/lifecycle.ts";
 import { zResourceRow, zResourceTarget } from "./row.ts";
 export {
     type ResourceQuery,

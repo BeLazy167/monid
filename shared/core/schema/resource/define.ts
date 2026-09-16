@@ -3,10 +3,7 @@ import { parseSchema } from "../parse.ts";
 import { type ResourceDef, type ResourceDefSeed, zResourceDef } from "./def.ts";
 import type { Json } from "../json/type.ts";
 import type { HookLogger } from "../hooks/ctx.ts";
-import type {
-    ActualCost,
-    ChargeWindow,
-} from "./billing.ts";
+import type { ActualCost, ChargeWindow } from "./billing.ts";
 import type {
     CheckOutcome,
     RefreshOutcome,
@@ -53,7 +50,6 @@ export interface TypedActualCostCtx<Data> {
 
 type SeedBilling = NonNullable<ResourceDefSeed["billing"]>;
 type SeedOps = ResourceDefSeed["ops"];
-type SeedExternals = NonNullable<ResourceDefSeed["externals"]>;
 
 /**
  * defineResource — the parsed seed, with the ROW's `data` typed by the
@@ -97,7 +93,7 @@ export function defineResource<DataSchema extends z.ZodType>(
                     ) => Promise<Json>;
                     display?: boolean;
                 }
-            > & SeedExternals;
+            >;
         },
 ): ResourceDef {
     return parseSchema(
