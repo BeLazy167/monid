@@ -88,18 +88,17 @@ export function directTransport(opts: {
                     redirect: "manual",
                 });
                 const body = await response.text();
-                // fetch spec: Headers iterates lower-cased names with
-                // multi-values comma-joined — exactly the HttpResult shape
-                const headers: Record<string, string> = {};
-                for (const [name, value] of response.headers) {
-                    headers[name] = value;
-                }
                 return {
                     status: response.status,
                     body,
+                    // `redirect: "manual"` above means a 3xx arrives WITH its
+                    // Location intact and an empty body — the header IS the
+                    // payload for presigned-URL endpoints. Header keys are
+                    // lowercased (multi-values comma-joined) by the Fetch
+                    // spec's Headers iterator.
+                    headers: Object.fromEntries(response.headers),
                     contentType: response.headers.get("content-type") ??
                         undefined,
-                    headers,
                 };
             } catch (error) {
                 if (error instanceof EngineError) throw error;

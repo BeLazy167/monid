@@ -76,17 +76,22 @@ export const zHttpCall = z.strictObject({
 );
 export type HttpCall = z.infer<typeof zHttpCall>;
 
-/** What utils.http returns: status + sniff-decoded body + response
- *  headers (LOWER-CASED keys; multi-valued headers comma-joined per the
- *  fetch spec). Vendor non-2xx is RETURNED (data), never thrown — the fn
- *  decides; transport failures throw EXECUTION_FAILED through the fn
- *  (retriable). `headers` is optional for fixture-era compatibility:
- *  absent means "not captured", and fns must treat a missing header and a
- *  missing map identically. */
+/** What utils.http returns: status + response headers + sniff-decoded body.
+ *  Vendor non-2xx is RETURNED (data), never thrown — the fn decides; transport
+ *  failures throw EXECUTION_FAILED through the fn (retriable). */
 export interface HttpResult {
     status: number;
+    /** The VENDOR'S RESPONSE headers, keys LOWERCASED — envelope facts a
+     *  vendor answers WITH instead of a body (a 302's `location` IS the
+     *  payload for an endpoint whose answer is the redirect target — a
+     *  presigned URL minted per request; `retry-after`, `content-range` and
+     *  `link` pagination are the same shape). Always present ({} when the
+     *  transport reports none), so fns never branch on presence. REQUEST
+     *  headers — where credentials live — stay invisible to fns: redirects
+     *  are never followed, so a credential never travels to the target
+     *  either (design D16). */
+    headers: Record<string, string>;
     body: Json;
-    headers?: Record<string, string>;
 }
 
 export type LifecycleHttpFn = (call: HttpCall) => Promise<HttpResult>;

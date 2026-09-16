@@ -61,12 +61,12 @@ export interface PreparedRequest {
 export interface TransportResponse {
     status: number;
     body: string;
-    contentType?: string;
-    /** Response headers, LOWER-CASED keys (multi-valued comma-joined per
-     *  the fetch spec). Optional: fixtures recorded before this field
-     *  simply have none, and consumers must treat absent and empty
-     *  identically. */
+    /** The vendor's response headers, keys LOWERCASED (multi-valued
+     *  comma-joined per the fetch spec). OPTIONAL so a transport that
+     *  does not surface them stays source-compatible; the engine
+     *  presents `{}` to fns in that case. */
     headers?: Record<string, string>;
+    contentType?: string;
 }
 
 /** The only IO port of the engine. Owns credential injection + egress. */
