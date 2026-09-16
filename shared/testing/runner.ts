@@ -86,7 +86,10 @@ export interface RunEndpointOptions {
     unit: SealedUnit;
     input: RunInput;
     mode: RunMode;
-    /** replay mode: the fixture to serve. */
+    /** replay mode: the fixture to serve. OMIT it to assert the test
+     *  makes ZERO upstream calls (gate misses, reader-only endpoints,
+     *  local completions) — any fetch then fails loudly instead of
+     *  silently consuming a placeholder chain. */
     fixture?: Fixture;
     /** record mode: captured calls are pushed here. */
     sink?: RecordedCall[];
@@ -107,7 +110,23 @@ function testTransport(opts: {
     switch (opts.mode) {
         case "replay": {
             if (!opts.fixture) {
-                throw new Error("replay mode requires a fixture");
+                // NO fixture = the test's assertion that ZERO upstream
+                // calls happen — strictly stronger than a placeholder
+                // chain (which an accidental call could silently consume)
+                return directTransport({
+                    params: () => Promise.resolve({ apiKey: "test-key" }),
+                    fetch: (input, init) =>
+                        Promise.reject(
+                            new Error(
+                                "replay: no fixture — this test expects " +
+                                    "zero upstream calls, got " +
+                                    `${
+                                        (init as { method?: string })
+                                            ?.method ?? "GET"
+                                    } ${String(input)}`,
+                            ),
+                        ),
+                });
             }
             return directTransport({
                 params: () => Promise.resolve({ apiKey: "test-key" }),

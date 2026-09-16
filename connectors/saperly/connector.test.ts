@@ -154,12 +154,15 @@ Deno.test("saperly provision: connection-first fails fast — no purchase, no se
 // place-calls — the metered async run
 // ---------------------------------------------------------------------------
 
-Deno.test("saperly place-calls: the run IS the call — settles at the carrier record", async () => {
+Deno.test("saperly place-calls: the run IS the call — grace parks the settle race, then bills the carrier record", async () => {
     const result = await runEndpoint({
         unit: await testSealedUnit("saperly#place-calls"),
         input: CALL_INPUT,
         mode: "replay",
-        fixture: await fixture("call-happy"),
+        // ONE chain (merged happy + settle-grace): mid-flight RUNNING,
+        // two terminal-but-unsettled reads on the graceLeft countdown,
+        // then the settled record
+        fixture: await fixture("call-settled"),
         resources: OWNED,
     });
     assertEquals(result.httpStatus, 200);
@@ -168,6 +171,8 @@ Deno.test("saperly place-calls: the run IS the call — settles at the carrier r
     assertEquals(result.usage.credits, { default: 0.25 });
     assertEquals(result.usage.mismatch?.derived, { default: 0.28 });
     assertEquals(result.usage.evidence, { SECOND: 53 });
+    // four polls: running + two grace parks + the settled read
+    assertEquals(result.timing.attempts, 4);
     // the USES settle mark — the host's reconcile tick
     assertEquals(result.resources?.reconciles, [{
         resource: "saperly/phone-number",
@@ -184,7 +189,7 @@ Deno.test("saperly place-calls: FOREIGN number → the uniform 404, zero usage, 
         unit: await testSealedUnit("saperly#place-calls"),
         input: { body: { fromNumberId: "num-FOREIGN", to: "+14155550123" } },
         mode: "replay",
-        fixture: await fixture("call-happy"), // no call may be consumed
+        // no fixture: the gate must fire before ANY upstream call
         resources: OWNED,
     });
     assertEquals(result.httpStatus, 404);
@@ -204,19 +209,6 @@ Deno.test("saperly place-calls: born-terminal zero-second call bills zero", asyn
     assertEquals(result.httpStatus, 200);
     assertEquals(result.usage.evidence, { SECOND: 0 });
     assertEquals(result.usage.credits, {});
-});
-
-Deno.test("saperly place-calls: the settle-race grace parks, then bills the settled record", async () => {
-    const result = await runEndpoint({
-        unit: await testSealedUnit("saperly#place-calls"),
-        input: CALL_INPUT,
-        mode: "replay",
-        fixture: await fixture("call-settle-grace"),
-        resources: OWNED,
-    });
-    assertEquals(result.httpStatus, 200);
-    assertEquals(result.usage.evidence, { SECOND: 53 });
-    assertEquals(result.usage.credits, { default: 0.25 });
 });
 
 Deno.test("saperly place-calls: an upstream refusal is data — zero usage", async () => {
@@ -272,7 +264,7 @@ Deno.test("saperly place-calls: estimate floors at one minute; accrued() prices 
         unit: await testSealedUnit("saperly#place-calls"),
         input: CALL_INPUT,
         mode: "replay",
-        fixture: await fixture("call-happy"),
+        // no fixture: estimate/accrued are PURE — zero upstream calls
         resources: OWNED,
     });
     // 60 s floor → ceil(60/60) × $0.28
@@ -294,7 +286,7 @@ Deno.test("saperly list-numbers: served from the ownership window only", async (
         unit,
         input: {},
         mode: "replay",
-        fixture: await fixture("call-happy"), // zero calls consumed
+        // no fixture: served from the reader alone — zero upstream calls
         resources: OWNED,
     });
     assertEquals(seeded.httpStatus, 200);
@@ -310,7 +302,6 @@ Deno.test("saperly list-numbers: served from the ownership window only", async (
         unit,
         input: {},
         mode: "replay",
-        fixture: await fixture("call-happy"),
         resources: [],
     });
     assertEquals(empty.output, []);
@@ -321,7 +312,7 @@ Deno.test("saperly get-numbers: row + LIVE persona in one call, projected", asyn
         unit: await testSealedUnit("saperly#get-numbers"),
         input: { body: { numberId: "num-1" } },
         mode: "replay",
-        fixture: await fixture("get-number-happy"),
+        fixture: await fixture("connection-read"),
         resources: OWNED,
     });
     assertEquals(result.httpStatus, 200);
@@ -338,7 +329,7 @@ Deno.test("saperly get-numbers: foreign id → the uniform 404 from the pre-gate
         unit: await testSealedUnit("saperly#get-numbers"),
         input: { body: { numberId: "num-FOREIGN" } },
         mode: "replay",
-        fixture: await fixture("get-number-happy"),
+        // no fixture: the pre-gate answers before any upstream call
         resources: OWNED,
     });
     assertEquals(result.httpStatus, 404);
@@ -391,7 +382,7 @@ Deno.test("saperly release-numbers: local ack + the RELEASES settle mark", async
         unit: await testSealedUnit("saperly#release-numbers"),
         input: { body: { numberId: "num-1" } },
         mode: "replay",
-        fixture: await fixture("call-happy"), // zero calls consumed
+        // no fixture: a LOCAL ack — zero upstream calls
         resources: OWNED,
     });
     assertEquals(result.httpStatus, 202);
@@ -613,7 +604,7 @@ Deno.test("saperly inbound-messages: the event summary IS the billed output", as
         unit: await testSealedUnit("saperly#inbound-messages"),
         input: { body: { messageId: "msg-1", numberId: "num-1", body: "hi" } },
         mode: "replay",
-        fixture: await fixture("call-happy"), // zero calls consumed
+        // no fixture: the event summary IS the output — zero upstream calls
     });
     assertEquals(result.httpStatus, 200);
     assertEquals(result.usage.credits, { default: 0.025 });
