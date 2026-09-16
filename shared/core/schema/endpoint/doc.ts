@@ -12,6 +12,8 @@ import { zEndpointMeta } from "../meta/endpoint.ts";
 import { zJsonSchemaDoc } from "./json-schema-doc.ts";
 import { zFnRef } from "../fn-table/ref.ts";
 import { zTimeouts } from "../sections/timeouts.ts";
+import { zResourceInteraction } from "../sections/resource-binding.ts";
+import { zResourceId } from "../resource/ids.ts";
 import { zCredits, zUsageModel } from "../usage/model/mod.ts";
 
 /**
@@ -87,6 +89,14 @@ export const zEndpointDoc = z.strictObject({
          *  A resolved claim WINS over the derived fold at settle
          *  (design D27). */
         consolidate: zFnRef.optional(),
+        /** Mid-run cost curve (design D35) — requires lifecycle.poll
+         *  (compile-checked). */
+        accrue: z.strictObject({
+            intervalMs: z.number().int().positive(),
+            counts: zFnRef,
+            buffer: z.record(z.string().min(1), z.number().nonnegative())
+                .optional(),
+        }).optional(),
     }),
     /**
      * Async run protocol (engine ≥ config schema.async_since). When present
@@ -101,6 +111,16 @@ export const zEndpointDoc = z.strictObject({
         /** JSON Schema of the fn-owned `state.data` bag — engine-validated
          *  per tick (typed state, resolved endpoint ?? provider). */
         stateSchema: zJsonSchemaDoc.optional(),
+    }).optional(),
+    /** Endpoint↔resource binding (design D32), compiled: fn slots as $fn
+     *  refs, the binding invariants already compile-checked. Presence
+     *  unlocks `utils.resources` and demands a ResourceReader at load. */
+    resource: z.strictObject({
+        id: zResourceId,
+        interaction: zResourceInteraction,
+        key: z.string().min(1).optional(),
+        seed: zFnRef.optional(),
+        ensure: zFnRef.optional(),
     }).optional(),
     timeouts: zTimeouts,
     /** Hash of the stable serialization (minus this field) — covers $fn ids. */
@@ -117,10 +137,15 @@ export function fnKeysOf(doc: EndpointDoc): string[] {
     keys.push(doc.usage.estimate.$fn.key);
     keys.push(doc.usage.evidence.$fn.key);
     if (doc.usage.consolidate) keys.push(doc.usage.consolidate.$fn.key);
+    if (doc.usage.accrue) keys.push(doc.usage.accrue.counts.$fn.key);
     if (doc.lifecycle) {
         keys.push(doc.lifecycle.start.$fn.key);
         if (doc.lifecycle.poll) keys.push(doc.lifecycle.poll.$fn.key);
         if (doc.lifecycle.stop) keys.push(doc.lifecycle.stop.$fn.key);
+    }
+    if (doc.resource) {
+        if (doc.resource.seed) keys.push(doc.resource.seed.$fn.key);
+        if (doc.resource.ensure) keys.push(doc.resource.ensure.$fn.key);
     }
     return [...new Set(keys)];
 }

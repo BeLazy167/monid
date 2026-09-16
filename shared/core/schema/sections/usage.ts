@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+    zAccrueSection,
     zUsageConsolidateFn,
     zUsageEstimateFn,
     zUsageEvidenceFn,
@@ -41,5 +42,10 @@ export const zUsageSection = z.strictObject({
     estimate: zUsageEstimateFn.optional(),
     evidence: zUsageEvidenceFn.optional(),
     consolidate: zUsageConsolidateFn.optional(),
+    /** MID-RUN cost curve (design D35, hooks/accrue.ts) — elapsedMs →
+     *  counts, host-driven on a cadence to grow the admission hold.
+     *  Requires a resolved lifecycle.poll (compile-checked): only a
+     *  pollable run has a mid-flight to price. */
+    accrue: zAccrueSection.optional(),
 });
 export type UsageSection = z.infer<typeof zUsageSection>;

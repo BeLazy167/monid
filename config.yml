@@ -39,6 +39,12 @@ schema:
     # — zHttpCall.queryParams now takes a scalar or a list, normalized by
     # the engine, so a lifecycle fn passing a list needs 0.1.0.
     async_since: "0.1.0" # engine release of the lifecycle (async) hook family; stamped as lifecycle fn entries' `api`
+    # 0.2.0: the RESOURCE family ships (add-resource-lifecycle-saperly) —
+    # resource docs, endpoint bindings, resource ops/billing/webhooks. A new
+    # fact rather than riding async_since: resource fns are their own hook
+    # family with their own ctx (no request, ResourceOpUtils), and endpoint
+    # docs WITHOUT bindings must not inherit the resource floor.
+    resources_since: "0.2.0" # engine release of the resource family; resource docs' floor + resource fn entries' `api`
     state_max_bytes: 65536 # hard engine cap on serialized lifecycle state (ids + billing signals, never payloads)
 
 compiler:

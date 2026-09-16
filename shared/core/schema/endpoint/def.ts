@@ -7,6 +7,7 @@ import {
     zInputSection,
     zLifecycleSection,
     zOutputSection,
+    zResourceBindingSection,
     zTimeoutsSection,
     zUsageSection,
 } from "../sections/mod.ts";
@@ -43,6 +44,10 @@ export const zEndpointDef = z.strictObject({
      *  engine runs it INSTEAD of executing `request` itself; `request` stays
      *  required and travels into the fns as ctx.data.request. */
     lifecycle: zLifecycleSection.optional(),
+    /** Endpoint↔resource binding (design D32) — ENDPOINT-ONLY, never
+     *  provider-defaulted; unlocks `utils.resources` and the engine's
+     *  ownership gate / settle marks. */
+    resource: zResourceBindingSection.optional(),
 });
 
 export type EndpointDefSeed = z.input<typeof zEndpointDef>;

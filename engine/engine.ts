@@ -1,6 +1,9 @@
 import { greaterThan, parse as parseSemver } from "@std/semver";
 import {
+    type ActualCost,
     assembleUsage,
+    type ChargeWindow,
+    type CheckOutcome,
     contractConfig,
     countsMismatch,
     creditsDisagree,
@@ -9,22 +12,35 @@ import {
     type FnState,
     type FnUsage,
     formatZodError,
+    getPath,
     type HookLogger,
     type Json,
     type LifecycleOutcome,
     type LifecycleRequestInfo,
     type LifecycleUtils,
+    type ProvisionSeed,
     pruneZeroCredits,
+    type RefreshOutcome,
+    type ReleaseOutcome,
+    type ResourceDoc,
+    type ResourceEffects,
+    ResourceInteraction,
+    type ResourceRow,
+    type ResourceTarget,
     type RunCompleted,
     type RunInput,
     RunKind,
     type RunPollResult,
     type RunStartResult,
     type RunState,
+    type RunStopResult,
     type RunTiming,
     type RunTimingInFlight,
+    StopKind,
     type Usage,
     zeroUsage,
+    zResourceRow,
+    zResourceSealedUnit,
     zRunState,
     zSealedUnit,
 } from "@shared/core";
@@ -33,11 +49,25 @@ import denoJson from "./deno.json" with { type: "json" };
 import type {
     ConnectorEngine,
     EngineCtx,
+    ResourceReader,
+    RunHandle,
     RunnableEndpoint,
+    RunnableResource,
 } from "./interfaces/mod.ts";
 import { EngineError, EngineErrorCode } from "./errors.ts";
-import { type LinkedFns, linkFns } from "./link.ts";
-import { makeLifecycleUtils, toHookLogger } from "./fn-utils.ts";
+import {
+    type LinkedFns,
+    type LinkedResourceFns,
+    linkFns,
+    linkResourceFns,
+} from "./link.ts";
+import {
+    makeLifecycleUtils,
+    makeResourceOpUtils,
+    makeResourcesWindow,
+    toHookLogger,
+    undeclaredResources,
+} from "./fn-utils.ts";
 import { buildRequest, substituteUrl, validateInput } from "./request.ts";
 import { sniffDecode } from "./transport.ts";
 import { validateAgainst } from "./validate.ts";
@@ -90,10 +120,58 @@ export class Engine implements ConnectorEngine {
                 `${doc.id} needs engine ${doc.minEngineVersion}, this engine is ${ENGINE_VERSION}`,
             );
         }
+        // D32 fail-closed: a bound endpoint without its ownership window
+        // must not run — caught HERE (host wiring), never mid-run.
+        if (doc.resource && !this.ctx.resources) {
+            throw new EngineError(
+                EngineErrorCode.NO_RESOURCE_READER,
+                `${doc.id} binds resource ${doc.resource.id} but EngineCtx ` +
+                    `carries no ResourceReader`,
+            );
+        }
         const hookLogger = toHookLogger(this.logger);
         const linked = await linkFns(doc, fns, ENGINE_VERSION, hookLogger);
         this.logger.debug("loaded endpoint", { id: doc.id });
         return new LoadedEndpoint(
+            doc,
+            fns[doc.auth.inject.$fn.key],
+            linked,
+            this.ctx,
+            this.logger,
+        );
+    }
+
+    /** Parse + gate + link a RESOURCE sealed unit ({resourceDoc, fns}) —
+     *  same fail-closed gate ladder as endpoints. */
+    async loadResource(unitJson: unknown): Promise<LoadedResource> {
+        const parsed = zResourceSealedUnit.safeParse(unitJson);
+        if (!parsed.success) {
+            throw new EngineError(
+                EngineErrorCode.BAD_DOC,
+                `resource sealed unit invalid: ${formatZodError(parsed.error)}`,
+            );
+        }
+        const { doc, fns } = parsed.data;
+        if (
+            greaterThan(
+                parseSemver(doc.minEngineVersion),
+                parseSemver(ENGINE_VERSION),
+            )
+        ) {
+            throw new EngineError(
+                EngineErrorCode.UNSUPPORTED_DOC,
+                `${doc.id} needs engine ${doc.minEngineVersion}, this engine is ${ENGINE_VERSION}`,
+            );
+        }
+        const hookLogger = toHookLogger(this.logger);
+        const linked = await linkResourceFns(
+            doc,
+            fns,
+            ENGINE_VERSION,
+            hookLogger,
+        );
+        this.logger.debug("loaded resource", { id: doc.id });
+        return new LoadedResource(
             doc,
             fns[doc.auth.inject.$fn.key],
             linked,
@@ -113,7 +191,10 @@ export class LoadedEndpoint implements RunnableEndpoint {
     ) {}
 
     /** utils.http/request bound PER INVOCATION: this tick's derived input +
-     *  substituted request (the v2 provider runtime). */
+     *  substituted request (the v2 provider runtime). `sleep` is budget-
+     *  bounded per invocation; `resources` is the real ownership window
+     *  iff the doc declares a binding (design D32 — capability follows
+     *  declaration), else the RESOURCES_UNDECLARED stub. */
     private utilsFor(
         input: RunInput,
         requestInfo: LifecycleRequestInfo,
@@ -124,7 +205,66 @@ export class LoadedEndpoint implements RunnableEndpoint {
             transport: this.ctx.transport,
             requestInfo,
             input,
+            sleep: (ms) => (this.ctx.sleep ?? sleep)(ms),
+            resources: this.doc.resource && this.ctx.resources
+                ? makeResourcesWindow(this.doc.id, this.ctx.resources)
+                : undeclaredResources(this.doc.id),
         });
+    }
+
+    /** The binding's ownership TARGET for this call — the JSONPath `key`
+     *  resolved against the VALIDATED (pre-toRequest) input. Undefined
+     *  for unbound docs and CREATES (nothing exists yet to target); an
+     *  unresolvable/non-string key is the CALLER's fault (the input
+     *  simply does not name a resource) → INVALID_INPUT. */
+    private resolveTarget(runInput: RunInput): ResourceTarget | undefined {
+        const binding = this.doc.resource;
+        if (!binding || binding.key === undefined) return undefined;
+        const input = validateInput(this.doc, runInput);
+        const value = getPath(input as unknown as Json, binding.key);
+        if (typeof value !== "string" || value.length === 0) {
+            throw new EngineError(
+                EngineErrorCode.INVALID_INPUT,
+                `${this.doc.id}: resource key ${binding.key} did not resolve ` +
+                    `to a non-empty string in the validated input`,
+            );
+        }
+        return { resource: binding.id, externalId: value };
+    }
+
+    /** The D32 ownership PRE-GATE: not owned ⇒ the uniform vendor-shaped
+     *  404 AS DATA — zero usage, upstream never touched, shaped exactly
+     *  like a provider miss so callers need no new branch. */
+    private async gateOwnership(
+        target: ResourceTarget,
+    ): Promise<RunCompleted | undefined> {
+        // reader presence is a load() invariant for bound docs
+        const reader = this.ctx.resources as ResourceReader;
+        const rows = await makeResourcesWindow(this.doc.id, reader).owned({
+            resource: target.resource,
+            externalId: target.externalId,
+        });
+        if (rows.length > 0) return undefined;
+        const at = this.now().toISOString();
+        return {
+            kind: RunKind.COMPLETED,
+            httpStatus: 404,
+            output: {
+                error: "not_found",
+                message:
+                    `resource ${target.resource} "${target.externalId}" is not owned by this workspace`,
+            },
+            usage: zeroUsage(),
+            isProviderError: true,
+            timing: {
+                startedAt: at,
+                completedAt: at,
+                attempts: 0,
+                startRequestMs: 0,
+                pollMsTotal: 0,
+                providerTotalMs: 0,
+            },
+        };
     }
 
     // ---- Temporal-activity-shaped: stateless, strict-JSON in/out, no sleeps ----
@@ -156,20 +296,43 @@ export class LoadedEndpoint implements RunnableEndpoint {
         return assembleUsage(model, fnUsage.counts);
     }
 
-    async start(runInput: RunInput): Promise<RunStartResult> {
+    /** PRE-RUN prerequisites (design D32) — its own method so hosts can
+     *  persist the returned seeds BEFORE start() executes (v1 ordering:
+     *  a mid-run crash never orphans an upstream resource). */
+    async ensure(runInput: RunInput): Promise<ProvisionSeed[]> {
+        if (!this.fns.ensure) return [];
+        const input = validateInput(this.doc, runInput);
+        const request = this.requestInfo(this.deriveInput(runInput));
+        return await this.fns.ensure(
+            { input, scope: { key: this.ctx.scopeKey ?? "local" } },
+            this.utilsFor(input, request),
+        );
+    }
+
+    async start(
+        runInput: RunInput,
+        run?: RunHandle,
+    ): Promise<RunStartResult> {
         const doc = this.doc;
         const input = this.deriveInput(runInput);
         const t0 = this.now();
+
+        // D32 ownership pre-gate — before ANY upstream effect, both modes.
+        const target = this.resolveTarget(runInput);
+        if (target) {
+            const miss = await this.gateOwnership(target);
+            if (miss) return miss;
+        }
 
         // LIFECYCLE mode: the start fn replaces the declarative execution —
         // the compiled request rides in as DATA (ctx.data.request).
         if (this.fns.lifecycleStart) {
             const request = this.requestInfo(input);
             const outcome = await this.fns.lifecycleStart(
-                { input, request },
+                { input, request, run: this.runInfo(run) },
                 this.utilsFor(input, request),
             );
-            return this.fromOutcome(outcome, input, undefined, t0);
+            return this.fromOutcome(outcome, input, undefined, t0, target);
         }
 
         // DECLARATIVE mode (sync): one request, engine-executed.
@@ -185,6 +348,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
             sniffDecode(response),
             undefined,
             undefined,
+            target,
             {
                 startedAt: t0.toISOString(),
                 completedAt: completedAt.toISOString(),
@@ -210,7 +374,11 @@ export class LoadedEndpoint implements RunnableEndpoint {
      * way in (zRunState + the doc's stateSchema — defense against
      * host-side payload corruption).
      */
-    async poll(runInput: RunInput, state: RunState): Promise<RunPollResult> {
+    async poll(
+        runInput: RunInput,
+        state: RunState,
+        run?: RunHandle,
+    ): Promise<RunPollResult> {
         if (!this.fns.lifecyclePoll) {
             throw new EngineError(
                 EngineErrorCode.NOT_ASYNC,
@@ -222,29 +390,97 @@ export class LoadedEndpoint implements RunnableEndpoint {
         const request = this.requestInfo(input);
         const t0 = this.now();
         const outcome = await this.fns.lifecyclePoll(
-            { input, request, lifecycle: { state: prevState } },
+            {
+                input,
+                request,
+                run: this.runInfo(run),
+                lifecycle: { state: prevState },
+            },
             this.utilsFor(input, request),
         );
-        return this.fromOutcome(outcome, input, prevState, t0);
+        return this.fromOutcome(
+            outcome,
+            input,
+            prevState,
+            t0,
+            this.resolveTarget(runInput),
+        );
     }
 
-    /** Best-effort, idempotent teardown: no lifecycle.stop ⇒ no-op; with one,
-     *  EVERY failure is swallowed (cleanup never masks the run outcome). */
-    async stop(runInput: RunInput, state: RunState): Promise<void> {
-        if (!this.fns.lifecycleStop) return;
+    /**
+     * Teardown WITH A VOICE (design D34): a COMPLETED outcome from the fn
+     * settles through the one pipeline (metered work that already
+     * happened bills at stop); UNRESOLVED demands host reconciliation;
+     * void (or no stop fn / a swallowed failure on an unmetered doc) is
+     * STOPPED_UNSETTLED — the exact pre-resource posture, now stated.
+     * NEVER throws for fn failures (cleanup never masks the outcome):
+     * a throw on a doc that bills mid-run work (usage.accrue) surfaces
+     * as UNRESOLVED — someone must go look before money settles.
+     */
+    async stop(
+        runInput: RunInput,
+        state: RunState,
+        run?: RunHandle,
+    ): Promise<RunStopResult> {
+        if (!this.fns.lifecycleStop) {
+            return { kind: StopKind.STOPPED_UNSETTLED };
+        }
+        const prevState = this.parseThreadedState(state);
+        const t0 = this.now();
         try {
-            const prevState = this.parseThreadedState(state);
             const input = this.deriveInput(runInput);
             const request = this.requestInfo(input);
-            await this.fns.lifecycleStop(
-                { input, request, lifecycle: { state: prevState } },
+            const outcome = await this.fns.lifecycleStop(
+                {
+                    input,
+                    request,
+                    run: this.runInfo(run),
+                    lifecycle: { state: prevState },
+                },
                 this.utilsFor(input, request),
             );
+            if (outcome === undefined) {
+                return { kind: StopKind.STOPPED_UNSETTLED };
+            }
+            if (outcome.kind === RunKind.COMPLETED) {
+                return this.fromOutcome(
+                    outcome,
+                    input,
+                    prevState,
+                    t0,
+                    this.resolveTarget(runInput),
+                ) as RunCompleted;
+            }
+            // UNRESOLVED — merge the last known state for the host
+            const fnFields = this.nextFnState(outcome.state, prevState);
+            const timing = this.advanceTiming(
+                prevState.timing,
+                t0,
+                Math.max(0, this.now().getTime() - t0.getTime()),
+            );
+            const lastState: RunState = { ...fnFields, timing };
+            this.assertState(lastState);
+            return {
+                kind: StopKind.UNRESOLVED,
+                ...(outcome.reason !== undefined
+                    ? { reason: outcome.reason }
+                    : {}),
+                state: lastState,
+            };
         } catch (error) {
-            this.logger.warn("lifecycle.stop failed (best-effort, ignored)", {
+            this.logger.warn("lifecycle.stop failed (never masks the run)", {
                 id: this.doc.id,
                 error: String(error),
             });
+            // a metered doc's failed teardown is a money question — flag it
+            if (this.doc.usage.accrue) {
+                return {
+                    kind: StopKind.UNRESOLVED,
+                    reason: `lifecycle.stop failed: ${error}`,
+                    state: prevState,
+                };
+            }
+            return { kind: StopKind.STOPPED_UNSETTLED };
         }
     }
 
@@ -257,13 +493,31 @@ export class LoadedEndpoint implements RunnableEndpoint {
     ): Promise<RunCompleted> {
         const doSleep = this.ctx.sleep ?? sleep;
         const deadline = this.now().getTime() + this.doc.timeouts.runMs;
-        let tick = await this.start(runInput);
+        // ONE identity for the whole run — idempotency keys stay stable
+        // across every phase of this loop.
+        const run: RunHandle = { runId: crypto.randomUUID() };
+        // inline ensure (v1 ordering): the OSS path has no persistence —
+        // seeds are surfaced to the log; hosted callers run ensure() as
+        // its own pre-start activity and persist.
+        const seeds = await this.ensure(runInput);
+        if (seeds.length > 0) {
+            this.logger.info("ensure provisioned resources", {
+                id: this.doc.id,
+                seeds: seeds.map((seed) => ({
+                    resource: seed.resource,
+                    externalId: seed.externalId,
+                })),
+            });
+        }
+        let tick = await this.start(runInput, run);
         while (tick.kind === RunKind.RUNNING) {
             if (this.now().getTime() > deadline) {
-                await this.stop(runInput, tick.state);
+                const stopped = await this.stop(runInput, tick.state, run);
+                if (stopped.kind === RunKind.COMPLETED) return stopped;
                 throw new EngineError(
                     EngineErrorCode.TIMEOUT,
-                    `${this.doc.id} exceeded runMs ${this.doc.timeouts.runMs}`,
+                    `${this.doc.id} exceeded runMs ${this.doc.timeouts.runMs}` +
+                        ` (stop: ${stopped.kind})`,
                 );
             }
             // cap the nap by the remaining budget: a fn requesting a long
@@ -274,7 +528,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
                 Math.min(tick.pollAfterMs, Math.max(remaining, 0)),
                 opts?.signal,
             );
-            tick = await this.poll(runInput, tick.state);
+            tick = await this.poll(runInput, tick.state, run);
         }
         return tick;
     }
@@ -287,6 +541,35 @@ export class LoadedEndpoint implements RunnableEndpoint {
         let input = validateInput(this.doc, runInput);
         if (this.fns.toRequest) input = this.fns.toRequest({ input });
         return input;
+    }
+
+    /** The run identity into ctx.data.run — the host's handle, or a
+     *  minted UUID (valid but not retry-stable; hosts that need stable
+     *  vendor idempotency keys pass their own). */
+    private runInfo(run: RunHandle | undefined): { runId: string } {
+        return { runId: run?.runId ?? crypto.randomUUID() };
+    }
+
+    /** MID-RUN accrued cost (design D35) — PURE: the accrue counts fn on
+     *  elapsedMs, the declared per-key buffer added on top, folded
+     *  through the doc's own rate card. Docs without usage.accrue fall
+     *  back to the estimate (a flat promise IS its own curve). */
+    accrued(runInput: RunInput, elapsedMs: number): Usage {
+        const accrue = this.doc.usage.accrue;
+        if (!accrue || !this.fns.accrueCounts) return this.estimate(runInput);
+        const input = validateInput(this.doc, runInput);
+        const model = this.doc.usage.model;
+        const fnUsage = this.fns.accrueCounts({
+            elapsedMs: Math.max(0, elapsedMs),
+            input,
+            usage: { model },
+        });
+        this.validateUsage(fnUsage);
+        const counts = { ...fnUsage.counts };
+        for (const [key, extra] of Object.entries(accrue.buffer ?? {})) {
+            counts[key] = (counts[key] ?? 0) + extra;
+        }
+        return assembleUsage(model, counts);
     }
 
     /** The compiled request as DATA into lifecycle fns ({pathParam}s
@@ -385,6 +668,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
         input: RunInput,
         prevState: RunState | undefined,
         t0: Date,
+        target?: ResourceTarget,
     ): RunStartResult {
         const completedAt = this.now();
         const tickMs = Math.max(0, completedAt.getTime() - t0.getTime());
@@ -427,6 +711,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
             outcome.output,
             finalState,
             outcome.providerHttpStatus,
+            target,
             {
                 startedAt: timing.startedAt,
                 completedAt: completedAt.toISOString(),
@@ -456,6 +741,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
         raw: Json,
         state: RunState | undefined,
         providerHttpStatus: number | undefined,
+        target: ResourceTarget | undefined,
         timing: RunTiming,
     ): RunCompleted {
         const doc = this.doc;
@@ -553,6 +839,12 @@ export class LoadedEndpoint implements RunnableEndpoint {
                 }
             }
         }
+        // D32 settle marks — SUCCESS only (a failed run neither
+        // provisions nor releases); derived from the binding's
+        // interaction, the host's persistence work-order.
+        const resources = isProviderError
+            ? undefined
+            : this.deriveEffects(input, output, state, target);
         // flat, kind-discriminated (no nested result to unwrap)
         return {
             kind: RunKind.COMPLETED,
@@ -565,7 +857,54 @@ export class LoadedEndpoint implements RunnableEndpoint {
             usage,
             isProviderError,
             timing,
+            ...(resources !== undefined ? { resources } : {}),
         };
+    }
+
+    /** The binding's settle-side derivation (design D32): CREATES runs
+     *  the seed fn on the FINAL envelope; the gated interactions mark
+     *  their resolved target. READS marks nothing. */
+    private deriveEffects(
+        input: RunInput,
+        output: Json,
+        state: RunState | undefined,
+        target: ResourceTarget | undefined,
+    ): ResourceEffects | undefined {
+        const binding = this.doc.resource;
+        if (!binding) return undefined;
+        switch (binding.interaction) {
+            case ResourceInteraction.CREATES: {
+                if (!this.fns.seed) return undefined; // compile-guaranteed
+                const seed = this.fns.seed({
+                    input,
+                    output,
+                    ...(state !== undefined
+                        ? {
+                            state: {
+                                ...(state.externalRunId !== undefined
+                                    ? { externalRunId: state.externalRunId }
+                                    : {}),
+                                ...(state.stage !== undefined
+                                    ? { stage: state.stage }
+                                    : {}),
+                                ...(state.data !== undefined
+                                    ? { data: state.data }
+                                    : {}),
+                            },
+                        }
+                        : {}),
+                });
+                return seed === null ? undefined : { provisions: [seed] };
+            }
+            case ResourceInteraction.USES:
+                return target ? { reconciles: [target] } : undefined;
+            case ResourceInteraction.UPDATES:
+                return target ? { refreshes: [target] } : undefined;
+            case ResourceInteraction.RELEASES:
+                return target ? { releases: [target] } : undefined;
+            case ResourceInteraction.READS:
+                return undefined;
+        }
     }
 
     /** Counts ↔ model discipline (design D19), fail-closed (FN_CONTRACT —
@@ -622,6 +961,155 @@ export class LoadedEndpoint implements RunnableEndpoint {
                     `state carries ids + billing signals, never payloads`,
             );
         }
+    }
+}
+
+/**
+ * A loaded RESOURCE doc — the host-driven op surface (design D30/D31/D33).
+ * The host owns WHEN (schedules, holds, boundary settles); these methods
+ * own HOW. Every op takes the stored ROW, validated on the way in
+ * (identity + the doc's dataSchema — defense against host drift →
+ * INVALID_INPUT, the caller wrote it).
+ */
+export class LoadedResource implements RunnableResource {
+    constructor(
+        readonly doc: ResourceDoc,
+        private readonly injectEntry: Parameters<typeof buildRequest>[2],
+        private readonly fns: LinkedResourceFns,
+        private readonly ctx: EngineCtx,
+        private readonly logger: Logger,
+    ) {}
+
+    check(row: ResourceRow): Promise<CheckOutcome> {
+        const valid = this.parseRow(row);
+        return this.fns.check(
+            { target: this.targetOf(valid), row: valid },
+            this.utilsFor(valid),
+        );
+    }
+
+    release(row: ResourceRow): Promise<ReleaseOutcome> {
+        const valid = this.parseRow(row);
+        return this.fns.release(
+            { target: this.targetOf(valid), row: valid },
+            this.utilsFor(valid),
+        );
+    }
+
+    async refresh(row: ResourceRow): Promise<RefreshOutcome> {
+        if (!this.fns.refresh) {
+            throw new EngineError(
+                EngineErrorCode.NOT_ASYNC,
+                `${this.doc.id} declares no ops.refresh`,
+            );
+        }
+        const valid = this.parseRow(row);
+        const outcome = await this.fns.refresh(
+            { target: this.targetOf(valid), row: valid },
+            this.utilsFor(valid),
+        );
+        // the patch is the next stored snapshot — it must satisfy the
+        // doc's own data schema (FN_CONTRACT: the fn wrote it)
+        if (outcome.patch !== undefined) {
+            const check = validateAgainst(
+                this.doc.data.schema,
+                outcome.patch,
+            );
+            if (!check.ok) {
+                throw new EngineError(
+                    EngineErrorCode.FN_CONTRACT,
+                    `${this.doc.id}: refresh patch ${check.message}`,
+                );
+            }
+        }
+        return outcome;
+    }
+
+    actualCost(row: ResourceRow, window: ChargeWindow): Promise<ActualCost> {
+        if (!this.fns.actualCost) {
+            throw new EngineError(
+                EngineErrorCode.NOT_ASYNC,
+                `${this.doc.id} declares no variable billing — no meter to read`,
+            );
+        }
+        const valid = this.parseRow(row);
+        return this.fns.actualCost(
+            { target: this.targetOf(valid), row: valid, window },
+            this.utilsFor(valid),
+        );
+    }
+
+    external(kind: string, row: ResourceRow, args?: Json): Promise<Json> {
+        const read = this.fns.externals[kind];
+        if (!read) {
+            throw new EngineError(
+                EngineErrorCode.NOT_ASYNC,
+                `${this.doc.id} declares no external "${kind}" (declared: ${
+                    Object.keys(this.fns.externals).join(", ") || "none"
+                })`,
+            );
+        }
+        const valid = this.parseRow(row);
+        return read(
+            {
+                target: this.targetOf(valid),
+                row: valid,
+                ...(args !== undefined ? { args } : {}),
+            },
+            this.utilsFor(valid),
+        );
+    }
+
+    private targetOf(row: ResourceRow): ResourceTarget {
+        return { resource: this.doc.id, externalId: row.externalId };
+    }
+
+    /** Row discipline: structural shape + identity match + the doc's own
+     *  dataSchema over `data` — a corrupt row is the CALLER's fault. */
+    private parseRow(row: ResourceRow): ResourceRow {
+        const parsed = zResourceRow.safeParse(row);
+        if (!parsed.success) {
+            throw new EngineError(
+                EngineErrorCode.INVALID_INPUT,
+                `${this.doc.id}: resource row invalid: ${
+                    formatZodError(parsed.error)
+                }`,
+            );
+        }
+        if (parsed.data.resource !== this.doc.id) {
+            throw new EngineError(
+                EngineErrorCode.INVALID_INPUT,
+                `${this.doc.id}: row belongs to ${parsed.data.resource}`,
+            );
+        }
+        const check = validateAgainst(this.doc.data.schema, parsed.data.data);
+        if (!check.ok) {
+            throw new EngineError(
+                EngineErrorCode.INVALID_INPUT,
+                `${this.doc.id}: row.data ${check.message}`,
+            );
+        }
+        return parsed.data;
+    }
+
+    /** ResourceOpUtils bound to THIS row (external reads need it). */
+    private utilsFor(row: ResourceRow) {
+        return makeResourceOpUtils({
+            doc: this.doc,
+            auth: {
+                inject: {
+                    ref: this.doc.auth.inject,
+                    entry: this.injectEntry,
+                },
+                credentials: this.doc.auth.credentials,
+            },
+            transport: this.ctx.transport,
+            sleep: (ms) => (this.ctx.sleep ?? sleep)(ms),
+            external: (kind, args) =>
+                args === undefined
+                    ? this.external(kind, row)
+                    : this.external(kind, row, args),
+        });
     }
 }
 

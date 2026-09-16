@@ -6,3 +6,6 @@ export * from "./usage-evidence.ts";
 export * from "./estimate.ts";
 export * from "./auth-inject.ts";
 export * from "./lifecycle.ts";
+export * from "./accrue.ts";
+export * from "./resource-binding.ts";
+export * from "./webhooks.ts";
