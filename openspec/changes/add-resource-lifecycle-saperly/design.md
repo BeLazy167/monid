@@ -321,8 +321,12 @@ bytes and floors). What shipped instead:
   reject new-family docs anyway (their strictObject refuses the new keys
   AND the 0.2.0 floor gates them).
 - `fn_abi_since` stays 0.1.0: the ABI additions (ctx `run`, `utils.sleep`
-  / `resources`, `HttpResult.headers`, the stop-outcome voice) are
-  strictly additive — an existing fn runs unchanged on the new engine.
+  / `resources`, the stop-outcome voice) are strictly additive — an
+  existing fn runs unchanged on the new engine. (`HttpResult.headers`
+  landed on MAIN independently in the same release window — suzanne's
+  redirect artifacts — and moved `async_since` to 0.2.0 there; the merge
+  adopted main's contract: `headers` REQUIRED, `{}` when the transport
+  surfaces none, fixture headers ALLOWLISTED.)
 - NEW fact `schema.resources_since = 0.2.0` carries the whole family:
   stamped as the `api` of every resource-family fn (ops, externals,
   getActualCost, webhook fns, binding seed/ensure, accrue counts), the
