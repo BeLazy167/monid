@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { zBaseMeta } from "../meta/base.ts";
+import { zResourceSlug } from "./ids.ts";
 import { zSchemaCarrier } from "../hooks/ctx.ts";
 import { zResourceWebhooksSection } from "../sections/webhooks.ts";
 import { zReconcileUsage, zResourceUsage } from "./usage.ts";
@@ -29,6 +30,9 @@ import {
  * auth + origin + requestMs into the doc).
  */
 export const zResourceDef = z.strictObject({
+    /** REQUIRED self-identity (design D46): must equal the def's folder
+     *  name (loader-asserted) — the doc id is `<provider>/<slug>`. */
+    slug: zResourceSlug,
     meta: zBaseMeta,
     /** The stored-snapshot shape — what the host persists per owned
      *  instance and serves back into every op/endpoint read (compiled to

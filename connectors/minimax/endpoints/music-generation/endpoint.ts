@@ -37,6 +37,7 @@ export default defineEndpoint({
             "https://platform.minimax.io/docs/api-reference/music-generation",
         categories: ["music-generation"],
     },
+    endpoint: "/v1/music_generation",
     request: { method: "POST", path: "/v1/music_generation" },
     input: {
         schema: {

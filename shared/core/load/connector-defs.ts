@@ -157,6 +157,14 @@ async function collectResources(
                 `${where}/${entry.name}/resource.ts has no default export`,
             );
         }
+        // identity is DECLARED (design D46): the def names itself and the
+        // loader — the one place that sees both — asserts the folder
+        if (def.slug !== entry.name) {
+            throw new Error(
+                `${where}/${entry.name}: resource slug "${def.slug}" must ` +
+                    `equal the folder name`,
+            );
+        }
         resources.push({ name: entry.name, def });
     }
     return resources;

@@ -18,6 +18,7 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/social",
         categories: ["linkedin"],
     },
+    endpoint: "/v1/linkedin/posts",
     request: { method: "GET", path: "/v1/linkedin/posts" },
     input: { schema: { queryParams: zPloidLinkedinPostsQueryParams } },
     usage: {

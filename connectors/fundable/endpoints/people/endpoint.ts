@@ -29,6 +29,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/people/list",
         categories: ["funding-data", "people-enrichment"],
     },
+    endpoint: "/people",
     request: { method: "POST", path: "/people" },
     // `page_size` REQUIRED and CAPPED at the binding (design D25; see
     // endpoints/deals/endpoint.ts for the rule).

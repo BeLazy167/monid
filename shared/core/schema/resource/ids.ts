@@ -6,6 +6,16 @@ import { z } from "zod";
  * (`connectors/<provider>/resources/<name>/`), never authored — the
  * endpoint-id convention, applied to resources.
  */
+/** The resource's FOLDER identity — lowercase kebab, the `<slug>` of
+ *  `connectors/<provider>/resources/<slug>/` and the tail of the doc id
+ *  `<provider>/<slug>`. Declared on the def (design D46) and asserted
+ *  against the folder by the loader — identity is never implicit. */
+export const zResourceSlug = z.string().regex(
+    /^[a-z0-9][a-z0-9-]*$/,
+    "resource slug must be lowercase kebab-case",
+);
+export type ResourceSlug = z.infer<typeof zResourceSlug>;
+
 export const zResourceId = z.string().regex(
     /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/,
     "resource id must be <provider>/<name> (lowercase kebab-case)",

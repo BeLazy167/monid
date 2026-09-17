@@ -20,6 +20,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/investors/get",
         categories: ["funding-data"],
     },
+    endpoint: "/investor",
     request: { method: "GET", path: "/investor" },
     input: { schema: { queryParams: zInvestorQueryParams } },
     usage: {

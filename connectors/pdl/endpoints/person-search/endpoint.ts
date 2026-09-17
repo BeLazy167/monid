@@ -27,6 +27,7 @@ export default defineEndpoint({
             "https://docs.peopledatalabs.com/docs/reference-person-search-api",
         categories: ["people-enrichment"],
     },
+    endpoint: "/v5/person/search",
     request: { method: "POST", path: "/v5/person/search" },
     // `size` REQUIRED at the binding on BOTH variants (design D25 — the
     // mirror stays the faithful vendor contract, optional with vendor

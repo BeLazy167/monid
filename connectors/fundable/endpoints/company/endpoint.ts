@@ -20,6 +20,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/companies/get",
         categories: ["funding-data", "company-enrichment"],
     },
+    endpoint: "/company",
     request: { method: "GET", path: "/company" },
     input: { schema: { queryParams: zCompanyQueryParams } },
     usage: {

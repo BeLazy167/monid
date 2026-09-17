@@ -39,6 +39,7 @@ export default defineEndpoint({
         docsUrl: "https://console.suzanne3d.com/documentation/photo-to-3d",
         categories: ["3d-generation"],
     },
+    endpoint: "/v1/generations/photo-to-3d",
     request: { method: "POST", path: "/v1/generations/photo-to-3d" },
     input: {
         schema: {

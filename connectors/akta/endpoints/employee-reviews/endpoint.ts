@@ -17,6 +17,7 @@ export default defineEndpoint({
             "https://docs.akta.pro/api-reference/alternative-data/employee-reviews",
         categories: ["company-reviews"],
     },
+    endpoint: "/v1/company/employee-reviews",
     request: { method: "GET", path: "/v1/company/employee-reviews/" },
     // `limit` REQUIRED at the binding (design D25 — the mirror stays the
     // faithful vendor contract, optional there): it is the estimate's

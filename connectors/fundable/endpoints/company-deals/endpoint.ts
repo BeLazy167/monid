@@ -18,6 +18,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/companies/deals",
         categories: ["funding-data", "company-enrichment"],
     },
+    endpoint: "/company/deals",
     request: { method: "GET", path: "/company/deals" },
     // `page_size` REQUIRED and CAPPED at the binding (design D25; see
     // endpoints/deals/endpoint.ts for the rule) — here on queryParams.

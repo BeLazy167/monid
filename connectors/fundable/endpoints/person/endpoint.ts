@@ -19,6 +19,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/people/get",
         categories: ["funding-data", "people-enrichment"],
     },
+    endpoint: "/person",
     request: { method: "GET", path: "/person" },
     input: { schema: { queryParams: zPersonQueryParams } },
     usage: {

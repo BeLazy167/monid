@@ -22,6 +22,7 @@ export default defineEndpoint({
         docsUrl: "https://docs.octen.ai/api-reference/extract",
         categories: ["web-scraping"],
     },
+    endpoint: "/extract",
     request: { method: "POST", path: "/extract" },
     input: {
         schema: {

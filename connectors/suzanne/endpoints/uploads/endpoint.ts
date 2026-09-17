@@ -41,6 +41,7 @@ export default defineEndpoint({
         docsUrl: "https://console.suzanne3d.com/documentation/uploads",
         categories: ["3d-generation"],
     },
+    endpoint: "/v1/uploads",
     request: { method: "POST", path: "/v1/uploads" },
     lifecycle: {
         /** The plain relay: one POST that completes inline. Non-2xx rides

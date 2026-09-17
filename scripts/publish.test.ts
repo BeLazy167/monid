@@ -56,6 +56,7 @@ function makeBundle() {
                 summary: "Searches.",
                 categories: ["demo-cat"],
             },
+            endpoint: "/search",
             request: { method: "POST", path: "/search" },
             input: { schema: { body: z.object({ q: z.string() }) } },
         } as Parameters<typeof defineEndpoint>[0],

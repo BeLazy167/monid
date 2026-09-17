@@ -46,6 +46,7 @@ export default defineEndpoint({
             "https://platform.minimax.io/docs/api-reference/text-to-speech",
         categories: ["speech"],
     },
+    endpoint: "/v1/t2a_v2",
     request: { method: "POST", path: "/v1/t2a_v2" },
     input: {
         schema: {

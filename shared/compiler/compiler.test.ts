@@ -81,6 +81,7 @@ function makeEndpoint(overrides: Partial<EndpointDefSeed> = {}) {
                 summary: "Searches.",
                 categories: ["demo-cat"],
             },
+            endpoint: "/search",
             request: { method: "POST", path: "/search" },
             input: { schema: { body: z.object({ q: z.string() }) } },
             ...overrides,
@@ -186,6 +187,7 @@ Deno.test("compile produces doc maps + interned table; ids inferred; closure hol
             {
                 name: "other",
                 def: makeEndpoint({
+                    endpoint: "/other",
                     request: { method: "POST", path: "/other" },
                 }),
             },
@@ -237,6 +239,7 @@ Deno.test("coded rejections: a malformed def at the compiler boundary is DOC_MAL
             summary: "Bad.",
             categories: ["demo-cat"],
         },
+        endpoint: "/x",
         request: { method: "POST", path: "/x", baseUrl: "not a url" },
         input: { schema: {} },
     } as unknown as ReturnType<typeof makeEndpoint>;
@@ -276,6 +279,7 @@ Deno.test("D27 synthesis: meterless docs share ONE fnTable entry for estimate + 
             {
                 name: "free",
                 def: makeEndpoint({
+                    endpoint: "/free",
                     request: { method: "POST", path: "/free" },
                     usage: { model: { kind: "FREE" } },
                 }),
@@ -349,6 +353,7 @@ Deno.test("usage.consolidate is OPTIONAL: endpoint ?? provider fallback when dec
                 {
                     name: "other",
                     def: makeEndpoint({
+                        endpoint: "/other",
                         request: { method: "POST", path: "/other" },
                     }),
                 },
@@ -595,6 +600,7 @@ Deno.test("a provider declares the POOL SET; ONE endpoint per pool is enough", a
                 {
                     name: "enrich",
                     def: makeEndpoint({
+                        endpoint: "/enrich",
                         request: { method: "POST", path: "/enrich" },
                         usage: {
                             model: {
@@ -669,6 +675,7 @@ Deno.test("FREE docs compile with EMPTY credits — the provider's pool is anoth
             {
                 name: "paid",
                 def: makeEndpoint({
+                    endpoint: "/paid",
                     request: { method: "POST", path: "/paid" },
                 }),
             },
@@ -763,6 +770,7 @@ Deno.test("meta.notes CONCATENATE provider-then-endpoint (the one additive leaf)
                 name: "other",
                 def: makeEndpoint({
                     meta: { displayName: "O", summary: "o." }, // no notes
+                    endpoint: "/other",
                     request: { method: "POST", path: "/other" },
                 }),
             }],
@@ -810,6 +818,7 @@ Deno.test("meta.notes: endpoint-only, and absent everywhere leaves NO key", asyn
                 name: "other",
                 def: makeEndpoint({
                     meta: { displayName: "O", summary: "o." },
+                    endpoint: "/other",
                     request: { method: "POST", path: "/other" },
                 }),
             }],
@@ -917,6 +926,7 @@ Deno.test("baseUrl path prefixes survive resolution (concatenation, not URL-reso
             [{
                 name: "search",
                 def: makeEndpoint({
+                    endpoint: "/v1/search",
                     request: { method: "GET", path: "/v1/search" },
                 }),
             }],
@@ -946,6 +956,7 @@ Deno.test("baseUrl with a query string or fragment fails compilation", async () 
                         [{
                             name: "search",
                             def: makeEndpoint({
+                                endpoint: "/v1/search",
                                 request: { method: "GET", path: "/v1/search" },
                             }),
                         }],

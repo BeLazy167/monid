@@ -254,14 +254,15 @@ export async function compileBundle(
             const endpointFile = `${where}/endpoint.ts`;
             const def = parseDoc(zEndpointDef, rawDef, endpointFile);
 
-            // ---- PUBLIC identity (design D22): the def's `endpoint` path
-            // ?? request.path (trailing slashes stripped) — folder names
-            // are ORGANIZATIONAL only, never identity. id = provider# +
-            // the path minus its leading slash ("apify#apidojo/tweet-scraper").
+            // ---- PUBLIC identity (design D22/D46): the def's DECLARED
+            // `endpoint` path — never derived (folder names are
+            // ORGANIZATIONAL only, request paths are plumbing). id =
+            // provider# + the path minus its leading slash
+            // ("apify#apidojo/tweet-scraper").
             const endpointPath = parseDoc(
                 zEndpointPath,
-                def.endpoint ?? def.request.path.replace(/\/+$/, ""),
-                `${endpointFile}#endpoint (?? request.path)`,
+                def.endpoint,
+                `${endpointFile}#endpoint`,
             );
             const id = `${providerName}#${endpointPath.slice(1)}`;
             if (endpoints[id] !== undefined) {
@@ -1172,6 +1173,15 @@ async function compileResource(args: {
     const where = `connectors/${providerName}/resources/${resourceName}`;
     const resourceFile = `${where}/resource.ts`;
     const def = parseDoc(zResourceDef, args.rawDef, resourceFile);
+    // declared identity (design D46) — the loader asserts folder==slug on
+    // disk; the compiler re-asserts for hand-built sources (tests)
+    if (def.slug !== resourceName) {
+        throw new CompileError(
+            CompileErrorCode.DOC_MALFORMED,
+            `${where}: resource slug "${def.slug}" must equal the folder ` +
+                `name "${resourceName}"`,
+        );
+    }
     const id = `${providerName}/${resourceName}`;
 
     // ---- fused provider identity (no resource-level overrides) ----------

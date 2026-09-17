@@ -26,6 +26,7 @@ import {
  * degraded reads (a live number's E.164 does not vanish).
  */
 export default defineResource({
+    slug: "phone-number",
     meta: {
         displayName: "Phone Number",
         summary: "A rented US phone number with its AI persona.",
