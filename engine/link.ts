@@ -42,9 +42,6 @@ import {
     type UsageEstimateFn,
     UsageEvidenceContract,
     type UsageEvidenceFn,
-    zActualCost,
-    zActualCostData,
-    zCheckOutcome,
     zEnsureData,
     zJson,
     zLifecycleOutcome,
@@ -52,20 +49,23 @@ import {
     zLifecycleStopOutcome,
     zLifecycleTickData,
     zProvisionSeed,
+    zReconcileUsageData,
     zRefreshOutcome,
     zReleaseOutcome,
-    zResourceExternalData,
     zResourceOpData,
+    zUsageReading,
+    zVerifyOutcome,
+    zViewData,
 } from "@shared/core";
 import type {
-    ActualCost,
-    ActualCostData,
-    CheckOutcome,
     EnsureData,
+    ReconcileUsageData,
     RefreshOutcome,
     ReleaseOutcome,
-    ResourceExternalData,
     ResourceOpData,
+    UsageReading,
+    VerifyOutcome,
+    ViewData,
 } from "@shared/core";
 import { EngineError, EngineErrorCode } from "./errors.ts";
 import { fnUtils } from "./fn-utils.ts";
@@ -634,13 +634,13 @@ export async function linkFns(
 // resource docs (design D30/D31/D33)
 // ---------------------------------------------------------------------------
 
-/** Linked fns of one RESOURCE doc — ops + billing meter + external reads,
- *  each async + effectful (ResourceOpUtils passed per call). */
+/** Linked fns of one RESOURCE doc — lifecycle + reconcile meters + view
+ *  reads, each async + effectful (ResourceOpUtils passed per call). */
 export interface LinkedResourceFns {
-    check: (
+    verify: (
         data: ResourceOpData,
         utils: ResourceOpUtils,
-    ) => Promise<CheckOutcome>;
+    ) => Promise<VerifyOutcome>;
     release: (
         data: ResourceOpData,
         utils: ResourceOpUtils,
@@ -649,13 +649,17 @@ export interface LinkedResourceFns {
         data: ResourceOpData,
         utils: ResourceOpUtils,
     ) => Promise<RefreshOutcome>;
-    actualCost?: (
-        data: ActualCostData,
-        utils: ResourceOpUtils,
-    ) => Promise<ActualCost>;
-    externals: Record<
+    /** Per estimated usage line (design D39). */
+    reconcile: Record<
         string,
-        (data: ResourceExternalData, utils: ResourceOpUtils) => Promise<Json>
+        (
+            data: ReconcileUsageData,
+            utils: ResourceOpUtils,
+        ) => Promise<UsageReading>
+    >;
+    views: Record<
+        string,
+        (data: ViewData, utils: ResourceOpUtils) => Promise<Json>
     >;
 }
 
@@ -727,76 +731,77 @@ export async function linkResourceFns(
 ): Promise<LinkedResourceFns> {
     const logger = hookLogger;
     const linked: LinkedResourceFns = {
-        check: wrapResourceOp(
+        verify: wrapResourceOp(
             zResourceOpData,
-            zCheckOutcome,
+            zVerifyOutcome,
             await resolveFn(
-                doc.ops.check,
+                doc.lifecycle.verify,
                 fns,
                 engineVersion,
-                `${doc.id}#ops.check`,
+                `${doc.id}#lifecycle.verify`,
             ),
             doc.id,
-            "ops.check",
+            "lifecycle.verify",
             logger,
         ),
         release: wrapResourceOp(
             zResourceOpData,
             zReleaseOutcome,
             await resolveFn(
-                doc.ops.release,
+                doc.lifecycle.release,
                 fns,
                 engineVersion,
-                `${doc.id}#ops.release`,
+                `${doc.id}#lifecycle.release`,
             ),
             doc.id,
-            "ops.release",
+            "lifecycle.release",
             logger,
         ),
-        externals: {},
+        reconcile: {},
+        views: {},
     };
-    if (doc.ops.refresh) {
+    if (doc.lifecycle.refresh) {
         linked.refresh = wrapResourceOp(
             zResourceOpData,
             zRefreshOutcome,
             await resolveFn(
-                doc.ops.refresh,
+                doc.lifecycle.refresh,
                 fns,
                 engineVersion,
-                `${doc.id}#ops.refresh`,
+                `${doc.id}#lifecycle.refresh`,
             ),
             doc.id,
-            "ops.refresh",
+            "lifecycle.refresh",
             logger,
         );
     }
-    if (doc.billing?.variable) {
-        linked.actualCost = wrapResourceOp(
-            zActualCostData,
-            zActualCost,
+    for (const [line, entry] of Object.entries(doc.reconcileUsage ?? {})) {
+        linked.reconcile[line] = wrapResourceOp(
+            zReconcileUsageData,
+            zUsageReading,
             await resolveFn(
-                doc.billing.variable.getActualCost,
+                entry.get,
                 fns,
                 engineVersion,
-                `${doc.id}#billing.variable.getActualCost`,
+                `${doc.id}#reconcileUsage.${line}`,
             ),
             doc.id,
-            "billing.variable.getActualCost",
+            `reconcileUsage.${line}.get`,
             logger,
         );
     }
-    for (const [kind, external] of Object.entries(doc.externals ?? {})) {
-        linked.externals[kind] = wrapResourceOp(
-            zResourceExternalData,
+    for (const [kind, view] of Object.entries(doc.views ?? {})) {
+        linked.views[kind] = wrapResourceOp(
+            zViewData,
             zJson,
             await resolveFn(
-                external.read,
+                view.read,
                 fns,
                 engineVersion,
-                `${doc.id}#externals.${kind}`,
+                `${doc.id}#views.${kind}`,
             ),
             doc.id,
-            `externals.${kind}.read`,
+            `views.${kind}.read`,
             logger,
         );
     }

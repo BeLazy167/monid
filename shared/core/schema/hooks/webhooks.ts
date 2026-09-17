@@ -4,7 +4,7 @@ import { zRunInput } from "../run/input.ts";
 import { zEndpointId } from "../common/ids.ts";
 import { fnCarrier, type FnUtils, type HookLogger } from "./ctx.ts";
 import type { LifecycleHttpFn } from "./lifecycle.ts";
-import { zResourceRow, zResourceTarget } from "../resource/row.ts";
+import { zOwnedResource, zResourceTarget } from "../resource/row.ts";
 
 /**
  * WEBHOOK HOOKS (design D36) — declared on docs, EXECUTED BY THE HOST
@@ -170,7 +170,7 @@ export const zWebhookSubscribeFn = fnCarrier<WebhookSubscribeFn>(
 export const zResourceWebhookSubscribeData = z.strictObject({
     callbackUrl: z.url(),
     target: zResourceTarget,
-    row: zResourceRow,
+    resource: zOwnedResource,
 });
 export type ResourceWebhookSubscribeData = z.infer<
     typeof zResourceWebhookSubscribeData

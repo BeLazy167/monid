@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { z } from "zod";
-import type { ConnectorSource, ResourceRow } from "@shared/core";
+import type { ConnectorSource, OwnedResource } from "@shared/core";
 import {
     defineEndpoint,
     defineProvider,
@@ -55,16 +55,18 @@ function resourceConnector(): ConnectorSource[] {
                     summary: "A demo widget.",
                 },
                 data: z.strictObject({ color: z.string() }),
-                billing: {
-                    period: { unit: "MONTH", count: 1 },
-                    rent: {
-                        consumes: { credit: "default", amount: 1 },
-                        chargeLeadMs: 0,
-                        releaseLeadMs: 0,
+                usage: {
+                    period: {
+                        unit: "MONTH",
+                        count: 1,
+                        anchor: "CREATION_TIME",
+                    },
+                    lines: {
+                        rent: { consumes: { credit: "default", amount: 1 } },
                     },
                 },
-                ops: {
-                    check: async ({ utils }) => {
+                lifecycle: {
+                    verify: async ({ utils }) => {
                         const res = await utils.http({
                             method: "GET",
                             path: "/widgets",
@@ -199,7 +201,7 @@ function scripted(
     });
 }
 
-const reader = (rows: ResourceRow[]): ResourceReader => ({
+const reader = (rows: OwnedResource[]): ResourceReader => ({
     owned: (query) =>
         Promise.resolve(rows.filter((row) =>
             row.resource === query.resource &&
@@ -208,7 +210,7 @@ const reader = (rows: ResourceRow[]): ResourceReader => ({
         )),
 });
 
-const OWNED: ResourceRow[] = [{
+const OWNED: OwnedResource[] = [{
     resource: "resdemo/widget",
     externalId: "w-1",
     data: { color: "red" },
@@ -379,11 +381,11 @@ Deno.test("resources: utils.sleep is bounded — a per-call breach is FN_CONTRAC
 Deno.test("resources: refresh patch is validated against the doc's data schema", async () => {
     const bundle = await bundleOf();
     const unit = sealResourceUnit(bundle, "resdemo/widget");
-    const row: ResourceRow = OWNED[0];
+    const owned: OwnedResource = OWNED[0];
     const good = await (new Engine({
         transport: scripted([{ status: 200, body: {} }]),
     })).loadResource(unit);
-    assertEquals(await good.refresh(row), {
+    assertEquals(await good.refresh(owned), {
         active: true,
         patch: { color: "blue" },
     });
@@ -391,7 +393,7 @@ Deno.test("resources: refresh patch is validated against the doc's data schema",
         // non-200 flips the op into emitting the OFF-SCHEMA patch
         transport: scripted([{ status: 201, body: {} }]),
     })).loadResource(unit);
-    const error = await assertRejects(() => bad.refresh(row), EngineError);
+    const error = await assertRejects(() => bad.refresh(owned), EngineError);
     assertEquals(error.code, EngineErrorCode.FN_CONTRACT);
 });
 

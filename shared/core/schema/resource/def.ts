@@ -2,27 +2,27 @@ import { z } from "zod";
 import { zBaseMeta } from "../meta/base.ts";
 import { zSchemaCarrier } from "../hooks/ctx.ts";
 import { zResourceWebhooksSection } from "../sections/webhooks.ts";
-import { zResourceBilling } from "./billing.ts";
+import { zReconcileUsage, zResourceUsage } from "./usage.ts";
 import {
-    zResourceCheckFn,
-    zResourceExternal,
     zResourceRefreshFn,
     zResourceReleaseFn,
+    zResourceVerifyFn,
+    zViews,
 } from "./ops.ts";
 
 /**
  * zResourceDef — a RESOURCE as a first-class sibling of the endpoint def
- * (design D30): the durable, billable thing a provider can OWN on a
- * workspace's behalf (a phone number, a mailbox, a VM). Lives at
- * `connectors/<provider>/resources/<name>/resource.ts`; its id
- * `<provider>/<name>` is folder-inferred, never authored.
+ * (design D30, refined D38–D42): the durable thing a provider can OWN on
+ * a workspace's behalf (a phone number, a mailbox, a VM). Lives at
+ * `connectors/<provider>/resources/<slug>/resource.ts`; id
+ * `<provider>/<slug>`.
  *
- * The def declares WHAT the resource is (data shape), what the PLATFORM
- * may do to it unprompted (ops — no user input by construction: an op fn
- * ctx simply has no input field), how money flows while it exists
- * (billing), its always-live reads (externals) and its event streams
- * (webhooks). What USERS do to it is not here — user actions are ordinary
- * ENDPOINTS, bound via the endpoint's `resource:` block.
+ * The def declares WHAT the resource is (`data`), its RATE CARD
+ * (`usage` — pure data; this repo reports, the broker prices, the host
+ * charges), how estimated lines SYNC (`reconcileUsage`), its lifecycle
+ * (`lifecycle.verify/release/refresh` — platform-driven, no user input),
+ * its live reads (`views`) and its event streams (`webhooks`). What
+ * USERS do to it is ordinary ENDPOINTS, bound via `resources:` blocks.
  *
  * No auth/request/timeouts sections: resources always run under their
  * provider's fused identity (compiler copies the provider's resolved
@@ -30,34 +30,38 @@ import {
  */
 export const zResourceDef = z.strictObject({
     meta: zBaseMeta,
-    /** The stored-row shape — what the host persists per owned instance
-     *  and serves back into every op/endpoint read (compiled to JSON
-     *  Schema; live truth stays upstream, this is the snapshot). */
+    /** The stored-snapshot shape — what the host persists per owned
+     *  instance and serves back into every op/endpoint read (compiled to
+     *  JSON Schema; live truth stays upstream). An owned instance
+     *  carries these fields as `.data`. */
     data: zSchemaCarrier,
     /** DISPLAY/CATALOG-ONLY input shapes of the user actions (create /
      *  update / release) — the acquisition surface a catalog can render
      *  without walking endpoints. The EXECUTABLE contracts stay on the
      *  bound endpoints; the compiler checks each bound endpoint's input
-     *  is a SUPERSET of the matching slot here. */
+     *  can CARRY the matching slot's required props. */
     inputs: z.strictObject({
         create: zSchemaCarrier.optional(),
         update: zSchemaCarrier.optional(),
         release: zSchemaCarrier.optional(),
     }).optional(),
-    /** Absent = a free resource (no schedule at all). */
-    billing: zResourceBilling.optional(),
-    ops: z.strictObject({
-        check: zResourceCheckFn,
+    /** The RATE CARD (design D39) — REQUIRED: even a free resource
+     *  declares a $0 fixed line with a real period (the host lifecycle
+     *  always has a settle boundary). */
+    usage: zResourceUsage,
+    /** The SYNC defs for estimated lines (design D39): per-line
+     *  `{everyMs, get}` — compile-checked to cover exactly the estimated
+     *  lines. */
+    reconcileUsage: zReconcileUsage.optional(),
+    /** The resource's lifecycle (design D41): aliveness → teardown →
+     *  re-sync. Platform-driven; an op fn ctx simply has no input. */
+    lifecycle: z.strictObject({
+        verify: zResourceVerifyFn,
         release: zResourceReleaseFn,
         refresh: zResourceRefreshFn.optional(),
     }),
-    externals: z.record(
-        z.string().regex(
-            /^[a-z0-9][a-z0-9-]*$/,
-            "external kind must be lowercase kebab-case",
-        ),
-        zResourceExternal,
-    ).optional(),
+    /** Named LIVE reads of the upstream object (design D42). */
+    views: zViews.optional(),
     webhooks: zResourceWebhooksSection.optional(),
 });
 

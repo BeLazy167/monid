@@ -1,19 +1,16 @@
 import type {
-    ActualCost,
-    ChargeWindow,
-    CheckOutcome,
     EndpointDoc,
     FnEntry,
     FnRef,
     HttpMethod,
     Json,
     JsonSchemaDoc,
+    OwnedResource,
     ProvisionSeed,
     RefreshOutcome,
     ReleaseOutcome,
     ResourceDoc,
     ResourceQuery,
-    ResourceRow,
     RunCompleted,
     RunInput,
     RunPollResult,
@@ -22,6 +19,9 @@ import type {
     RunState,
     RunStopResult,
     Usage,
+    UsageReading,
+    UsageWindow,
+    VerifyOutcome,
 } from "@shared/core";
 import type { Logger } from "@shared/logging";
 
@@ -87,7 +87,25 @@ export type ParamsResolver = (
  * none — never an error.
  */
 export interface ResourceReader {
-    owned(query: ResourceQuery): Promise<ResourceRow[]>;
+    owned(query: ResourceQuery): Promise<OwnedResource[]>;
+}
+
+/**
+ * The resource STORE port (design D46) — the reader plus writes,
+ * speaking the RESOURCE VERBS. Hosts (monid-services) and local tooling
+ * implement it; the ENGINE consumes only the reader half. A host that
+ * already implements ResourceReader completes the store with four
+ * methods.
+ */
+export interface IResourceStore extends ResourceReader {
+    /** Persist a provision seed as an owned instance. */
+    provision(resource: OwnedResource): Promise<void>;
+    /** Replace the stored data snapshot (a refresh patch). */
+    refresh(id: string, externalId: string, data: Json): Promise<void>;
+    /** Mark released — the instance leaves the ownership window. */
+    release(id: string, externalId: string): Promise<void>;
+    get(id: string, externalId: string): Promise<OwnedResource | undefined>;
+    list(): Promise<OwnedResource[]>;
 }
 
 export interface EngineCtx {
@@ -185,26 +203,30 @@ export interface RunnableEndpoint {
 }
 
 /**
- * Execution surface of a loaded RESOURCE doc — the host-driven ops
+ * Execution surface of a loaded RESOURCE doc — the host-driven lifecycle
  * (schedules, holds, boundary settles own the WHEN; these own the HOW).
- * Every method takes the stored ROW (validated against the doc's
- * dataSchema on the way in — defense against host drift); non-
+ * Every method takes the OWNED INSTANCE (validated against the doc's
+ * data schema on the way in — defense against host drift); non-
  * deterministic failures throw RESOURCE_OP_FAILED (retriable).
  */
 export interface RunnableResource {
     readonly doc: ResourceDoc;
-    /** Aliveness (v1 verify) — the host calls it before EVERY rent
-     *  charge; never charge a dead resource. */
-    check(row: ResourceRow): Promise<CheckOutcome>;
+    /** Aliveness (v1's word) — the host calls it before EVERY charge;
+     *  never charge a dead resource. */
+    verify(resource: OwnedResource): Promise<VerifyOutcome>;
     /** Idempotent upstream teardown (404/410 = success); may return the
-     *  vendor's settled final bill. */
-    release(row: ResourceRow): Promise<ReleaseOutcome>;
-    /** Re-sync the stored snapshot; NOT_ASYNC-style error when the doc
-     *  declares no refresh op. */
-    refresh(row: ResourceRow): Promise<RefreshOutcome>;
-    /** The variable-billing meter (design D31) — CUMULATIVE from the
-     *  usage-period start; errors when the doc has no variable billing. */
-    actualCost(row: ResourceRow, window: ChargeWindow): Promise<ActualCost>;
-    /** A named always-live read (design D33). */
-    external(kind: string, row: ResourceRow, args?: Json): Promise<Json>;
+     *  vendor's settled final usage. */
+    release(resource: OwnedResource): Promise<ReleaseOutcome>;
+    /** Re-sync the stored snapshot; errors when the doc declares no
+     *  refresh op. */
+    refresh(resource: OwnedResource): Promise<RefreshOutcome>;
+    /** The per-line cumulative meter (design D39) — errors when the
+     *  line has no reconciler. */
+    reconcileUsage(
+        line: string,
+        resource: OwnedResource,
+        window: UsageWindow,
+    ): Promise<UsageReading>;
+    /** A named LIVE view of the upstream object (design D42). */
+    view(kind: string, resource: OwnedResource, args?: Json): Promise<Json>;
 }

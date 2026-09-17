@@ -3,7 +3,7 @@ import {
     type Bundle,
     loadCategoryRegistry,
     loadConnectorDefs,
-    type ResourceRow,
+    type OwnedResource,
     type ResourceSealedUnit,
     type RunInput,
     type SealedUnit,
@@ -69,7 +69,7 @@ export async function testResourceUnit(
 
 /** An in-memory ResourceReader over fixture rows — the test stand-in for
  *  the host's ownership window (empty seed = owns nothing). */
-export function fixtureReader(rows: ResourceRow[] = []): ResourceReader {
+export function fixtureReader(rows: OwnedResource[] = []): ResourceReader {
     return {
         owned: (query) =>
             Promise.resolve(
@@ -96,7 +96,7 @@ export interface RunEndpointOptions {
     /** Owned-resource rows served to `utils.resources` and the ownership
      *  gate. A reader is ALWAYS wired (possibly empty) — bound docs load
      *  regardless; ownership is the fixture's story. */
-    resources?: ResourceRow[];
+    resources?: OwnedResource[];
     /** The opaque scope token `ensure` fns see (default "test-scope"). */
     scopeKey?: string;
 }

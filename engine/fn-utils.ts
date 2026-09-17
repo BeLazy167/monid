@@ -508,12 +508,11 @@ export function undeclaredResources(label: string): LifecycleResources {
 }
 
 /**
- * `ctx.utils` for RESOURCE-OP fns (check/release/refresh/getActualCost/
- * external reads): the pure ABI + `http` (raw calls against the RESOURCE
- * doc's provider origin, same-origin credential rule identical to
- * endpoints) + bounded `sleep` + `external` (the doc's own compiled
- * external readers — bound by the CALLER, since dispatching needs the
- * linked fn table).
+ * `ctx.utils` for RESOURCE fns (lifecycle verify/release/refresh, the
+ * reconcileUsage meters, view reads): the pure ABI + `http` (raw calls
+ * against the RESOURCE doc's provider origin, same-origin credential
+ * rule identical to endpoints) + bounded `sleep`. No view dispatch
+ * (design D42): a meter performs its own reads.
  */
 export function makeResourceOpUtils(opts: {
     /** The resource doc (id/provider/request/timeouts) + its auth pair. */
@@ -526,8 +525,6 @@ export function makeResourceOpUtils(opts: {
     auth: NonNullable<PreparedRequest["auth"]>;
     transport: Transport;
     sleep: (ms: number) => Promise<void>;
-    /** Dispatch into the doc's own linked external readers. */
-    external: ResourceOpUtils["external"];
 }): ResourceOpUtils {
     const { doc, transport } = opts;
     const origin = new URL(doc.request.url).origin;
@@ -535,7 +532,6 @@ export function makeResourceOpUtils(opts: {
         json: jsonUtil,
         money: moneyUtil,
         sleep: makeBoundedSleep(doc.id, opts.sleep),
-        external: opts.external,
         http: async (call) => {
             const parsed = zHttpCall.safeParse(call);
             if (!parsed.success) {

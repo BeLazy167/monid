@@ -14,11 +14,11 @@ import { Command } from "@cliffy/command";
 import { z } from "zod";
 import {
     type Json,
+    type OwnedResource,
     parseSchema,
-    type ResourceRow,
     type RunInput,
     sealUnit,
-    zResourceRow,
+    zOwnedResource,
 } from "@shared/core";
 import { directTransport, Engine } from "@monid/connector-engine";
 import { compileToOutput } from "./lib.ts";
@@ -45,7 +45,7 @@ const { options, args } = await new Command()
     .option("--path-params <json:string>", "RunInput.pathParams (JSON object).")
     .option(
         "--resources <file:string>",
-        "Owned-resource rows (a JSON file of ResourceRow[]) served to the " +
+        "Owned-resource rows (a JSON file of OwnedResource[]) served to the " +
             "ownership window. Bound endpoints run against an EMPTY " +
             "window when omitted (foreign ids answer the uniform 404).",
     )
@@ -88,9 +88,9 @@ console.error(
 
 // the CLI's ownership window: fixture rows from --resources, else empty
 // (bound endpoints still LOAD; ownership misses answer the uniform 404)
-const rows: ResourceRow[] = options.resources !== undefined
+const rows: OwnedResource[] = options.resources !== undefined
     ? parseSchema(
-        z.array(zResourceRow),
+        z.array(zOwnedResource),
         JSON.parse(await Deno.readTextFile(options.resources)),
         `--resources ${options.resources}`,
     )

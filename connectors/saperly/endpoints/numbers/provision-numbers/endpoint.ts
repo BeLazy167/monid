@@ -112,9 +112,11 @@ export default defineEndpoint({
                 // the QUOTED monthly — the host's sticky max-rule seed
                 ...(monthly !== undefined
                     ? {
-                        rentConsumes: {
-                            credit: "default",
-                            amount: monthly / 100,
+                        observedUsage: {
+                            rent: {
+                                credit: "default",
+                                amount: monthly / 100,
+                            },
                         },
                     }
                     : {}),

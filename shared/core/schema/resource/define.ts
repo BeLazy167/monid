@@ -3,19 +3,18 @@ import { parseSchema } from "../parse.ts";
 import { type ResourceDef, type ResourceDefSeed, zResourceDef } from "./def.ts";
 import type { Json } from "../json/type.ts";
 import type { HookLogger } from "../hooks/ctx.ts";
-import type { ActualCost, ChargeWindow } from "./billing.ts";
 import type {
-    CheckOutcome,
     RefreshOutcome,
     ReleaseOutcome,
     ResourceOpUtils,
+    VerifyOutcome,
 } from "./ops.ts";
-import type { ResourceTarget } from "./row.ts";
+import type { UsageReading, UsageWindow } from "./usage.ts";
 
-/** The op ctx with the ROW'S `data` typed as the def's own schema output
- *  (sound: the engine validates row.data against the compiled dataSchema
- *  before any op runs). */
-export interface TypedResourceRow<Data> {
+/** The op ctx with the INSTANCE's `data` typed as the def's own schema
+ *  output (sound: the engine validates it against the compiled data
+ *  schema before any op runs). */
+export interface TypedOwnedResource<Data> {
     resource: string;
     externalId: string;
     data: Data;
@@ -23,75 +22,69 @@ export interface TypedResourceRow<Data> {
 }
 
 export interface TypedResourceOpCtx<Data> {
-    data: { target: ResourceTarget; row: TypedResourceRow<Data> };
+    data: { resource: TypedOwnedResource<Data> };
     utils: ResourceOpUtils;
     logger: HookLogger;
 }
 
-export interface TypedResourceExternalCtx<Data> {
-    data: {
-        target: ResourceTarget;
-        row: TypedResourceRow<Data>;
-        args?: Json;
-    };
+export interface TypedViewCtx<Data> {
+    data: { resource: TypedOwnedResource<Data>; args?: Json };
     utils: ResourceOpUtils;
     logger: HookLogger;
 }
 
-export interface TypedActualCostCtx<Data> {
-    data: {
-        target: ResourceTarget;
-        row: TypedResourceRow<Data>;
-        window: ChargeWindow;
-    };
+export interface TypedReconcileUsageCtx<Data> {
+    data: { resource: TypedOwnedResource<Data>; window: UsageWindow };
     utils: ResourceOpUtils;
     logger: HookLogger;
 }
 
-type SeedBilling = NonNullable<ResourceDefSeed["billing"]>;
-type SeedOps = ResourceDefSeed["ops"];
+type SeedLifecycle = ResourceDefSeed["lifecycle"];
+type SeedReconcile = NonNullable<ResourceDefSeed["reconcileUsage"]>;
 
 /**
- * defineResource — the parsed seed, with the ROW's `data` typed by the
- * def's OWN `data` schema across every op/billing/external fn (the D23
- * pattern: the type layer narrows, zod stays the runtime truth; the
- * engine's per-call row validation is the soundness anchor).
+ * defineResource — the parsed seed, with the instance's `data` typed by
+ * the def's OWN `data` schema across every lifecycle/reconcile/view fn
+ * (the D23 pattern: the type layer narrows, zod stays the runtime truth;
+ * the engine's per-call instance validation is the soundness anchor).
  */
 export function defineResource<DataSchema extends z.ZodType>(
     seed:
-        & Omit<ResourceDefSeed, "data" | "billing" | "ops" | "externals">
+        & Omit<
+            ResourceDefSeed,
+            "data" | "lifecycle" | "views" | "reconcileUsage"
+        >
         & {
             data: DataSchema;
-            billing?: Omit<SeedBilling, "variable"> & {
-                variable?:
-                    & Omit<
-                        NonNullable<SeedBilling["variable"]>,
-                        "getActualCost"
-                    >
-                    & {
-                        getActualCost: (
-                            ctx: TypedActualCostCtx<z.output<DataSchema>>,
-                        ) => Promise<ActualCost>;
-                    };
-            };
-            ops: Omit<SeedOps, "check" | "release" | "refresh"> & {
-                check: (
-                    ctx: TypedResourceOpCtx<z.output<DataSchema>>,
-                ) => Promise<CheckOutcome>;
-                release: (
-                    ctx: TypedResourceOpCtx<z.output<DataSchema>>,
-                ) => Promise<ReleaseOutcome>;
-                refresh?: (
-                    ctx: TypedResourceOpCtx<z.output<DataSchema>>,
-                ) => Promise<RefreshOutcome>;
-            };
-            externals?: Record<
+            reconcileUsage?: Record<
+                string,
+                & Omit<SeedReconcile[string], "get">
+                & {
+                    get: (
+                        ctx: TypedReconcileUsageCtx<z.output<DataSchema>>,
+                    ) => Promise<UsageReading>;
+                }
+            >;
+            lifecycle:
+                & Omit<SeedLifecycle, "verify" | "release" | "refresh">
+                & {
+                    verify: (
+                        ctx: TypedResourceOpCtx<z.output<DataSchema>>,
+                    ) => Promise<VerifyOutcome>;
+                    release: (
+                        ctx: TypedResourceOpCtx<z.output<DataSchema>>,
+                    ) => Promise<ReleaseOutcome>;
+                    refresh?: (
+                        ctx: TypedResourceOpCtx<z.output<DataSchema>>,
+                    ) => Promise<RefreshOutcome>;
+                };
+            views?: Record<
                 string,
                 {
+                    label?: string;
                     read: (
-                        ctx: TypedResourceExternalCtx<z.output<DataSchema>>,
+                        ctx: TypedViewCtx<z.output<DataSchema>>,
                     ) => Promise<Json>;
-                    display?: boolean;
                 }
             >;
         },

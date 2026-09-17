@@ -1,6 +1,6 @@
 import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import { type Json, type ResourceRow, RunKind, StopKind } from "@shared/core";
+import { type Json, type OwnedResource, RunKind, StopKind } from "@shared/core";
 import { fnUtils } from "@monid/connector-engine";
 import {
     liveSkip,
@@ -23,7 +23,7 @@ const HERE = fromFileUrl(new URL("./", import.meta.url));
 const fixture = (name: string) => loadFixture(`${HERE}fixtures/${name}.json`);
 
 /** The one owned row every ownership test seeds. */
-const OWNED: ResourceRow[] = [{
+const OWNED: OwnedResource[] = [{
     resource: "saperly/phone-number",
     externalId: "num-1",
     data: {
@@ -72,7 +72,9 @@ Deno.test("saperly provision: happy saga — seed, quote claim, stripped output"
     assertEquals(seed.resource, "saperly/phone-number");
     assertEquals(seed.externalId, "num-1");
     assertEquals(seed.identifier, "+14155559999");
-    assertEquals(seed.rentConsumes, { credit: "default", amount: 2 });
+    assertEquals(seed.observedUsage, {
+        rent: { credit: "default", amount: 2 },
+    });
     assertEquals(
         (seed.data as Record<string, Json>).externalRefs,
         { connection: "conn-1" },
@@ -102,8 +104,8 @@ Deno.test("saperly provision: ONE PriceChanged retry re-consents at the actual p
     assertEquals(result.usage.credits, { default: 2.5 });
     assertEquals(result.usage.mismatch?.derived, { default: 2 });
     assertEquals(
-        result.resources?.provisions?.[0].rentConsumes,
-        { credit: "default", amount: 2.5 },
+        result.resources?.provisions?.[0].observedUsage,
+        { rent: { credit: "default", amount: 2.5 } },
     );
 });
 

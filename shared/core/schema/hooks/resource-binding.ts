@@ -4,7 +4,7 @@ import { zRunInput } from "../run/input.ts";
 import { zFnState } from "../run/state.ts";
 import { fnCarrier, type HookLogger, zFnUtils, zHookLogger } from "./ctx.ts";
 import { zResourceId } from "../resource/ids.ts";
-import { zRentConsumes } from "../resource/billing.ts";
+import { zLineConsumes } from "../resource/usage.ts";
 import type { LifecycleUtils } from "./lifecycle.ts";
 
 /**
@@ -33,16 +33,16 @@ import type { LifecycleUtils } from "./lifecycle.ts";
  *     address) — defaults to externalId host-side.
  *   - `data`: the initial `data`-schema snapshot (engine-validated
  *     against the resource doc's dataSchema when resolvable).
- *   - `rentConsumes`: the OBSERVED period-1 rent (v1 sticky max-rule
- *     seed) — what the vendor actually quoted at purchase; absent means
- *     "the doc's card is the whole truth".
+ *   - `observedUsage`: the OBSERVED period-1 draw per FIXED usage line
+ *     (v1 sticky max-rule seed) — what the vendor actually quoted at
+ *     purchase; absent means "the doc's card is the whole truth".
  */
 export const zProvisionSeed = z.strictObject({
     resource: zResourceId,
     externalId: z.string().min(1),
     identifier: z.string().min(1).optional(),
     data: zJson,
-    rentConsumes: zRentConsumes.optional(),
+    observedUsage: z.record(z.string().min(1), zLineConsumes).optional(),
 });
 export type ProvisionSeed = z.infer<typeof zProvisionSeed>;
 

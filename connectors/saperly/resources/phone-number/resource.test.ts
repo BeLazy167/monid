@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
-import type { Json, ResourceRow } from "@shared/core";
+import type { Json, OwnedResource } from "@shared/core";
 import { loadFixture, loadResource, testResourceUnit } from "@shared/testing";
 import { EngineError, EngineErrorCode } from "@monid/connector-engine";
 
@@ -8,15 +8,15 @@ import { EngineError, EngineErrorCode } from "@monid/connector-engine";
  * saperly/phone-number resource ops through the COMPILED doc (the same
  * sealed-unit path the host drives). Ops replay against MERGED chains,
  * driven sequentially on ONE loaded resource (fixture strategy v2 —
- * chains consume in order): the happy sequence (check → release), the
- * degraded sequence (released check → pointer-clearing refresh), and the
- * shared live persona read.
+ * chains consume in order): the happy sequence (verify → release), the
+ * degraded sequence (released verify → pointer-clearing refresh), and
+ * the shared live persona view.
  */
 
 const HERE = fromFileUrl(new URL("../../", import.meta.url));
 const fixture = (name: string) => loadFixture(`${HERE}fixtures/${name}.json`);
 
-const ROW: ResourceRow = {
+const ROW: OwnedResource = {
     resource: "saperly/phone-number",
     externalId: "num-1",
     data: {
@@ -27,27 +27,27 @@ const ROW: ResourceRow = {
     },
 };
 
-Deno.test("saperly resource: the happy op sequence — check (alive, observed price) then release (+ connection teardown)", async () => {
+Deno.test("saperly resource: the happy op sequence — verify (alive, observed usage) then release (+ connection teardown)", async () => {
     const resource = await loadResource({
         unit: await testResourceUnit("saperly/phone-number"),
         mode: "replay",
         fixture: await fixture("resource-ops"),
     });
-    assertEquals(await resource.check(ROW), {
+    assertEquals(await resource.verify(ROW), {
         active: true,
         periodEndIso: "2026-10-16T00:00:00Z",
-        observed: { consumes: { credit: "default", amount: 2 } },
+        observedUsage: { rent: { credit: "default", amount: 2 } },
     });
     assertEquals(await resource.release(ROW), { released: true });
 });
 
-Deno.test("saperly resource: the degraded sequence — released check, then refresh CLEARS the pointer", async () => {
+Deno.test("saperly resource: the degraded sequence — released verify, then refresh CLEARS the pointer", async () => {
     const resource = await loadResource({
         unit: await testResourceUnit("saperly/phone-number"),
         mode: "replay",
         fixture: await fixture("resource-degraded"),
     });
-    const checked = await resource.check(ROW);
+    const checked = await resource.verify(ROW);
     assertEquals(checked.active, false);
     assertEquals(checked.inactiveReason, "released_at:2026-09-15T00:00:00Z");
     const refreshed = await resource.refresh(ROW);
@@ -59,14 +59,14 @@ Deno.test("saperly resource: the degraded sequence — released check, then refr
     assertEquals(patch.country, "US");
 });
 
-Deno.test("saperly resource: the connection external is live and sanitized", async () => {
+Deno.test("saperly resource: the connection view is live and sanitized", async () => {
     const resource = await loadResource({
         unit: await testResourceUnit("saperly/phone-number"),
         mode: "replay",
         // the SAME chain /get-numbers replays — one reader, by design
         fixture: await fixture("connection-read"),
     });
-    const detail = await resource.external("connection", ROW) as Record<
+    const detail = await resource.view("connection", ROW) as Record<
         string,
         Json
     >;
@@ -76,7 +76,7 @@ Deno.test("saperly resource: the connection external is live and sanitized", asy
     assertEquals(connection.manualSecret, undefined);
 });
 
-Deno.test("saperly resource: no variable billing — actualCost refuses; foreign rows refused", async () => {
+Deno.test("saperly resource: a fixed line has no reconciler; foreign instances refused", async () => {
     const resource = await loadResource({
         unit: await testResourceUnit("saperly/phone-number"),
         mode: "replay",
@@ -84,15 +84,15 @@ Deno.test("saperly resource: no variable billing — actualCost refuses; foreign
     });
     await assertRejects(
         () =>
-            resource.actualCost(ROW, {
+            resource.reconcileUsage("rent", ROW, {
                 startIso: "2026-09-01T00:00:00Z",
                 endIso: "2026-09-16T00:00:00Z",
             }),
         EngineError,
-        "no variable billing",
+        "no reconcileUsage",
     );
     const foreign = await assertRejects(
-        () => resource.check({ ...ROW, resource: "saperly/other" }),
+        () => resource.verify({ ...ROW, resource: "saperly/other" }),
         EngineError,
     );
     assertEquals(

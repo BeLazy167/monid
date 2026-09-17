@@ -7,36 +7,28 @@ import { zFnRef } from "../fn-table/ref.ts";
 import { zWebhookSlug } from "../sections/webhooks.ts";
 import { zWebhookVerify } from "../hooks/webhooks.ts";
 import { zResourceId } from "./ids.ts";
-import { zBillingPeriod, zRent } from "./billing.ts";
-import { zConsumes } from "../usage/model/consumes.ts";
-import { zUnit } from "../usage/unit.ts";
+import {
+    RECONCILE_EVERY_FLOOR_MS,
+    zLineName,
+    zResourceUsage,
+} from "./usage.ts";
 
 /**
- * zResourceDoc — the COMPILED resource artifact (design D30): pure, flat,
- * strict JSON beside the endpoint docs in the bundle. Fn-bearing slots
- * hold `$fn` refs; auth + origin + timeout are FUSED from the provider at
- * compile (a resource doc executes as its own sealed unit, no provider
- * lookup at run time — the endpoint-doc rule).
+ * zResourceDoc — the COMPILED resource artifact (design D30, refined
+ * D39–D42): pure, flat, strict JSON beside the endpoint docs in the
+ * bundle. Fn-bearing slots hold `$fn` refs; auth + origin + timeout are
+ * FUSED from the provider at compile (a resource doc executes as its own
+ * sealed unit, no provider lookup at run time — the endpoint-doc rule).
  */
 
-export const zVariableBillingDoc = z.strictObject({
-    price: z.strictObject({
-        unit: zUnit,
-        every: z.number().int().positive(),
-        consumes: zConsumes,
+export const zReconcileUsageDoc = z.record(
+    zLineName,
+    z.strictObject({
+        everyMs: z.number().int().min(RECONCILE_EVERY_FLOOR_MS),
+        get: zFnRef,
     }),
-    holdCadenceMs: z.number().int().positive(),
-    buffer: zConsumes,
-    getActualCost: zFnRef,
-});
-export type VariableBillingDoc = z.infer<typeof zVariableBillingDoc>;
-
-export const zResourceBillingDoc = z.strictObject({
-    period: zBillingPeriod,
-    rent: zRent.optional(),
-    variable: zVariableBillingDoc.optional(),
-});
-export type ResourceBillingDoc = z.infer<typeof zResourceBillingDoc>;
+);
+export type ReconcileUsageDoc = z.infer<typeof zReconcileUsageDoc>;
 
 export const zResourceWebhookDoc = z.strictObject({
     verify: zWebhookVerify,
@@ -49,7 +41,7 @@ export type ResourceWebhookDoc = z.infer<typeof zResourceWebhookDoc>;
 
 export const zResourceDoc = z.strictObject({
     specVersion: z.literal(contractConfig.schema.specVersion),
-    /** "<provider>/<name>" — folder-derived, never authored. */
+    /** "<provider>/<slug>". */
     id: zResourceId,
     provider: zProviderName,
     /** Compiler-derived: semverMax(resources_since, api of every $fn). */
@@ -61,15 +53,22 @@ export const zResourceDoc = z.strictObject({
         update: zJsonSchemaDoc.optional(),
         release: zJsonSchemaDoc.optional(),
     }).optional(),
-    billing: zResourceBillingDoc.optional(),
-    ops: z.strictObject({
-        check: zFnRef,
+    /** The RATE CARD — inline data, priceable without executing
+     *  anything (design D39). */
+    usage: zResourceUsage,
+    /** Per estimated line: the sync cadence + the meter fn ref. */
+    reconcileUsage: zReconcileUsageDoc.optional(),
+    lifecycle: z.strictObject({
+        verify: zFnRef,
         release: zFnRef,
         refresh: zFnRef.optional(),
     }),
-    externals: z.record(
+    views: z.record(
         z.string().min(1),
-        z.strictObject({ read: zFnRef, display: z.boolean() }),
+        z.strictObject({
+            label: z.string().min(1).optional(),
+            read: zFnRef,
+        }),
     ).optional(),
     webhooks: z.record(zWebhookSlug, zResourceWebhookDoc).optional(),
     /** Fused from the provider (same injector + credential shape as the
@@ -91,13 +90,13 @@ export type ResourceDoc = z.infer<typeof zResourceDoc>;
 /** Collect every $fn id a resource doc references. */
 export function resourceFnKeysOf(doc: ResourceDoc): string[] {
     const keys: string[] = [doc.auth.inject.$fn.key];
-    keys.push(doc.ops.check.$fn.key, doc.ops.release.$fn.key);
-    if (doc.ops.refresh) keys.push(doc.ops.refresh.$fn.key);
-    if (doc.billing?.variable) {
-        keys.push(doc.billing.variable.getActualCost.$fn.key);
+    keys.push(doc.lifecycle.verify.$fn.key, doc.lifecycle.release.$fn.key);
+    if (doc.lifecycle.refresh) keys.push(doc.lifecycle.refresh.$fn.key);
+    for (const entry of Object.values(doc.reconcileUsage ?? {})) {
+        keys.push(entry.get.$fn.key);
     }
-    for (const external of Object.values(doc.externals ?? {})) {
-        keys.push(external.read.$fn.key);
+    for (const view of Object.values(doc.views ?? {})) {
+        keys.push(view.read.$fn.key);
     }
     for (const hook of Object.values(doc.webhooks ?? {})) {
         keys.push(hook.correlate.$fn.key, hook.dispatch.$fn.key);

@@ -97,7 +97,9 @@ export function listResources(
             provider: doc.provider,
             displayName: doc.meta.displayName,
             summary: doc.meta.summary,
-            billed: doc.billing !== undefined,
+            billed: Object.values(doc.usage.lines).some((line) =>
+                "price" in line || line.consumes.amount > 0
+            ),
         }));
 }
 

@@ -4,7 +4,7 @@ import { type Json, zJson } from "../json/type.ts";
 import { zRunInput } from "../run/input.ts";
 import { RunKind, zFnState, zRunState } from "../run/state.ts";
 import { fnCarrier, type FnUtils, type HookLogger } from "./ctx.ts";
-import type { ResourceQuery, ResourceRow } from "../resource/row.ts";
+import type { OwnedResource, ResourceQuery } from "../resource/row.ts";
 
 /**
  * THE LIFECYCLE HOOK FAMILY — `lifecycle.start` / `lifecycle.poll` /
@@ -120,7 +120,7 @@ export const SLEEP_BUDGET_MS = 120_000;
  * vendor-shaped 404, provision, etc.), never an engine error.
  */
 export interface LifecycleResources {
-    owned(query: ResourceQuery): Promise<ResourceRow[]>;
+    owned(query: ResourceQuery): Promise<OwnedResource[]>;
 }
 
 /**

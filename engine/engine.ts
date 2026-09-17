@@ -1,9 +1,6 @@
 import { greaterThan, parse as parseSemver } from "@std/semver";
 import {
-    type ActualCost,
     assembleUsage,
-    type ChargeWindow,
-    type CheckOutcome,
     contractConfig,
     countsMismatch,
     creditsDisagree,
@@ -18,6 +15,7 @@ import {
     type LifecycleOutcome,
     type LifecycleRequestInfo,
     type LifecycleUtils,
+    type OwnedResource,
     type ProvisionSeed,
     pruneZeroCredits,
     type RefreshOutcome,
@@ -25,7 +23,6 @@ import {
     type ResourceDoc,
     type ResourceEffects,
     ResourceInteraction,
-    type ResourceRow,
     type ResourceTarget,
     type RunCompleted,
     type RunInput,
@@ -38,8 +35,11 @@ import {
     type RunTimingInFlight,
     StopKind,
     type Usage,
+    type UsageReading,
+    type UsageWindow,
+    type VerifyOutcome,
     zeroUsage,
-    zResourceRow,
+    zOwnedResource,
     zResourceSealedUnit,
     zRunState,
     zSealedUnit,
@@ -963,8 +963,8 @@ export class LoadedEndpoint implements RunnableEndpoint {
 /**
  * A loaded RESOURCE doc — the host-driven op surface (design D30/D31/D33).
  * The host owns WHEN (schedules, holds, boundary settles); these methods
- * own HOW. Every op takes the stored ROW, validated on the way in
- * (identity + the doc's dataSchema — defense against host drift →
+ * own HOW. Every op takes the OWNED INSTANCE, validated on the way in
+ * (identity + the doc's data schema — defense against host drift →
  * INVALID_INPUT, the caller wrote it).
  */
 export class LoadedResource implements RunnableResource {
@@ -977,34 +977,28 @@ export class LoadedResource implements RunnableResource {
     ) {}
 
     // deno-lint-ignore require-await
-    async check(row: ResourceRow): Promise<CheckOutcome> {
-        const valid = this.parseRow(row);
-        return this.fns.check(
-            { target: this.targetOf(valid), row: valid },
-            this.utilsFor(valid),
-        );
+    async verify(resource: OwnedResource): Promise<VerifyOutcome> {
+        const valid = this.parseResource(resource);
+        return this.fns.verify({ resource: valid }, this.utils());
     }
 
     // deno-lint-ignore require-await
-    async release(row: ResourceRow): Promise<ReleaseOutcome> {
-        const valid = this.parseRow(row);
-        return this.fns.release(
-            { target: this.targetOf(valid), row: valid },
-            this.utilsFor(valid),
-        );
+    async release(resource: OwnedResource): Promise<ReleaseOutcome> {
+        const valid = this.parseResource(resource);
+        return this.fns.release({ resource: valid }, this.utils());
     }
 
-    async refresh(row: ResourceRow): Promise<RefreshOutcome> {
+    async refresh(resource: OwnedResource): Promise<RefreshOutcome> {
         if (!this.fns.refresh) {
             throw new EngineError(
                 EngineErrorCode.NOT_ASYNC,
-                `${this.doc.id} declares no ops.refresh`,
+                `${this.doc.id} declares no lifecycle.refresh`,
             );
         }
-        const valid = this.parseRow(row);
+        const valid = this.parseResource(resource);
         const outcome = await this.fns.refresh(
-            { target: this.targetOf(valid), row: valid },
-            this.utilsFor(valid),
+            { resource: valid },
+            this.utils(),
         );
         // the patch is the next stored snapshot — it must satisfy the
         // doc's own data schema (FN_CONTRACT: the fn wrote it)
@@ -1024,61 +1018,59 @@ export class LoadedResource implements RunnableResource {
     }
 
     // deno-lint-ignore require-await
-    async actualCost(
-        row: ResourceRow,
-        window: ChargeWindow,
-    ): Promise<ActualCost> {
-        if (!this.fns.actualCost) {
+    async reconcileUsage(
+        line: string,
+        resource: OwnedResource,
+        window: UsageWindow,
+    ): Promise<UsageReading> {
+        const get = this.fns.reconcile[line];
+        if (!get) {
             throw new EngineError(
                 EngineErrorCode.NOT_ASYNC,
-                `${this.doc.id} declares no variable billing — no meter to read`,
+                `${this.doc.id} declares no reconcileUsage for line ` +
+                    `"${line}" (declared: ${
+                        Object.keys(this.fns.reconcile).join(", ") || "none"
+                    })`,
             );
         }
-        const valid = this.parseRow(row);
-        return this.fns.actualCost(
-            { target: this.targetOf(valid), row: valid, window },
-            this.utilsFor(valid),
-        );
+        const valid = this.parseResource(resource);
+        return get({ resource: valid, window }, this.utils());
     }
 
     // deno-lint-ignore require-await
-    async external(
+    async view(
         kind: string,
-        row: ResourceRow,
+        resource: OwnedResource,
         args?: Json,
     ): Promise<Json> {
-        const read = this.fns.externals[kind];
+        const read = this.fns.views[kind];
         if (!read) {
             throw new EngineError(
                 EngineErrorCode.NOT_ASYNC,
-                `${this.doc.id} declares no external "${kind}" (declared: ${
-                    Object.keys(this.fns.externals).join(", ") || "none"
+                `${this.doc.id} declares no view "${kind}" (declared: ${
+                    Object.keys(this.fns.views).join(", ") || "none"
                 })`,
             );
         }
-        const valid = this.parseRow(row);
+        const valid = this.parseResource(resource);
         return read(
             {
-                target: this.targetOf(valid),
-                row: valid,
+                resource: valid,
                 ...(args !== undefined ? { args } : {}),
             },
-            this.utilsFor(valid),
+            this.utils(),
         );
     }
 
-    private targetOf(row: ResourceRow): ResourceTarget {
-        return { resource: this.doc.id, externalId: row.externalId };
-    }
-
-    /** Row discipline: structural shape + identity match + the doc's own
-     *  dataSchema over `data` — a corrupt row is the CALLER's fault. */
-    private parseRow(row: ResourceRow): ResourceRow {
-        const parsed = zResourceRow.safeParse(row);
+    /** Instance discipline: structural shape + identity match + the
+     *  doc's own data schema — a corrupt instance is the CALLER's
+     *  fault. */
+    private parseResource(resource: OwnedResource): OwnedResource {
+        const parsed = zOwnedResource.safeParse(resource);
         if (!parsed.success) {
             throw new EngineError(
                 EngineErrorCode.INVALID_INPUT,
-                `${this.doc.id}: resource row invalid: ${
+                `${this.doc.id}: owned resource invalid: ${
                     formatZodError(parsed.error)
                 }`,
             );
@@ -1086,21 +1078,20 @@ export class LoadedResource implements RunnableResource {
         if (parsed.data.resource !== this.doc.id) {
             throw new EngineError(
                 EngineErrorCode.INVALID_INPUT,
-                `${this.doc.id}: row belongs to ${parsed.data.resource}`,
+                `${this.doc.id}: instance belongs to ${parsed.data.resource}`,
             );
         }
         const check = validateAgainst(this.doc.data.schema, parsed.data.data);
         if (!check.ok) {
             throw new EngineError(
                 EngineErrorCode.INVALID_INPUT,
-                `${this.doc.id}: row.data ${check.message}`,
+                `${this.doc.id}: resource data ${check.message}`,
             );
         }
         return parsed.data;
     }
 
-    /** ResourceOpUtils bound to THIS row (external reads need it). */
-    private utilsFor(row: ResourceRow) {
+    private utils() {
         return makeResourceOpUtils({
             doc: this.doc,
             auth: {
@@ -1112,10 +1103,6 @@ export class LoadedResource implements RunnableResource {
             },
             transport: this.ctx.transport,
             sleep: (ms) => (this.ctx.sleep ?? sleep)(ms),
-            external: (kind, args) =>
-                args === undefined
-                    ? this.external(kind, row)
-                    : this.external(kind, row, args),
         });
     }
 }

@@ -10,6 +10,7 @@ import {
     type EndpointDoc,
     type FnRef,
     hasMeteredLines,
+    isEstimatedLine,
     type Json,
     type LeafCategory,
     parseSchema,
@@ -1187,55 +1188,78 @@ async function compileResource(args: {
         }) as Record<string, Json>
         : undefined;
 
-    // ---- fns: ops + billing meter + externals + webhooks ----------------
-    const checkRef = await interner.intern(
-        def.ops.check,
-        `${resourceFile}#ops.check`,
+    // ---- fns: lifecycle + reconcile meters + views + webhooks -----------
+    const verifyRef = await interner.intern(
+        def.lifecycle.verify,
+        `${resourceFile}#lifecycle.verify`,
         SC.resourcesSince,
     );
     const releaseRef = await interner.intern(
-        def.ops.release,
-        `${resourceFile}#ops.release`,
+        def.lifecycle.release,
+        `${resourceFile}#lifecycle.release`,
         SC.resourcesSince,
     );
-    const refreshRef = def.ops.refresh
+    const refreshRef = def.lifecycle.refresh
         ? await interner.intern(
-            def.ops.refresh,
-            `${resourceFile}#ops.refresh`,
+            def.lifecycle.refresh,
+            `${resourceFile}#lifecycle.refresh`,
             SC.resourcesSince,
         )
         : undefined;
-    const billing = def.billing
-        ? pruneUndefined({
-            period: def.billing.period as unknown as Json,
-            rent: def.billing.rent as unknown as Json,
-            variable: def.billing.variable
-                ? {
-                    price: def.billing.variable.price as unknown as Json,
-                    holdCadenceMs: def.billing.variable.holdCadenceMs,
-                    buffer: def.billing.variable.buffer as unknown as Json,
-                    getActualCost: await interner.intern(
-                        def.billing.variable.getActualCost,
-                        `${resourceFile}#billing.variable.getActualCost`,
-                        SC.resourcesSince,
-                    ) as unknown as Json,
-                }
-                : undefined,
-        }) as Record<string, Json>
-        : undefined;
-    const externals: Record<string, Json> = {};
+
+    // ---- reconcileUsage coherence (design D39): the sync defs cover
+    // EXACTLY the estimated lines — a fixed line cannot reconcile, an
+    // estimated line must.
+    const estimatedLines = new Set(
+        Object.entries(def.usage.lines)
+            .filter(([, line]) => isEstimatedLine(line))
+            .map(([name]) => name),
+    );
+    for (const line of Object.keys(def.reconcileUsage ?? {})) {
+        if (!estimatedLines.has(line)) {
+            throw new CompileError(
+                CompileErrorCode.DOC_MALFORMED,
+                `${where}: reconcileUsage.${line} names a line that is ` +
+                    `not ESTIMATED (only estimated lines reconcile)`,
+            );
+        }
+    }
+    for (const line of estimatedLines) {
+        if (def.reconcileUsage?.[line] === undefined) {
+            throw new CompileError(
+                CompileErrorCode.DOC_MALFORMED,
+                `${where}: estimated line "${line}" has no ` +
+                    `reconcileUsage entry — an estimation must sync`,
+            );
+        }
+    }
+    const reconcileUsage: Record<string, Json> = {};
     for (
-        const [kind, external] of Object.entries(def.externals ?? {})
+        const [line, entry] of Object.entries(def.reconcileUsage ?? {})
             .sort(([a], [b]) => a.localeCompare(b))
     ) {
-        externals[kind] = {
-            read: await interner.intern(
-                external.read,
-                `${resourceFile}#externals.${kind}`,
+        reconcileUsage[line] = {
+            everyMs: entry.everyMs,
+            get: await interner.intern(
+                entry.get,
+                `${resourceFile}#reconcileUsage.${line}`,
                 SC.resourcesSince,
             ) as unknown as Json,
-            display: external.display,
         };
+    }
+    const views: Record<string, Json> = {};
+    for (
+        const [kind, view] of Object.entries(def.views ?? {})
+            .sort(([a], [b]) => a.localeCompare(b))
+    ) {
+        views[kind] = pruneUndefined({
+            label: view.label,
+            read: await interner.intern(
+                view.read,
+                `${resourceFile}#views.${kind}`,
+                SC.resourcesSince,
+            ) as unknown as Json,
+        }) as Record<string, Json>;
     }
     const webhooks: Record<string, Json> = {};
     for (
@@ -1282,13 +1306,16 @@ async function compileResource(args: {
         meta,
         data: { schema: dataSchema },
         inputs: inputs && Object.keys(inputs).length > 0 ? inputs : undefined,
-        billing,
-        ops: {
-            check: checkRef as unknown as Json,
+        usage: def.usage as unknown as Json,
+        reconcileUsage: Object.keys(reconcileUsage).length > 0
+            ? reconcileUsage
+            : undefined,
+        lifecycle: {
+            verify: verifyRef as unknown as Json,
             release: releaseRef as unknown as Json,
             refresh: refreshRef as unknown as Json,
         },
-        externals: Object.keys(externals).length > 0 ? externals : undefined,
+        views: Object.keys(views).length > 0 ? views : undefined,
         webhooks: Object.keys(webhooks).length > 0 ? webhooks : undefined,
         auth: {
             inject: injectRef as unknown as Json,
