@@ -114,6 +114,20 @@ const TIER: Record<string, number> = {
     "surf#fund/detail": 1,
     "surf#fund/portfolio": 1,
     "surf#fund/ranking": 1,
+    "surf#heatscore/detail": 4,
+    "surf#heatscore/projects": 4,
+    "surf#heatscore/token-of-the-day": 4,
+    "surf#heatscore/token-of-week": 4,
+    "surf#hyperliquid/account": 4,
+    "surf#hyperliquid/candles": 4,
+    "surf#hyperliquid/fills": 4,
+    "surf#hyperliquid/leaderboard": 4,
+    "surf#hyperliquid/orders": 4,
+    "surf#hyperliquid/performance": 4,
+    "surf#hyperliquid/positions": 4,
+    "surf#hyperliquid/trades": 4,
+    "surf#hyperliquid/trades/aggregate": 4,
+    "surf#hyperliquid/trades/context": 4,
     "surf#market/etf": 2,
     "surf#market/exchange-flow/exchanges": 2,
     "surf#market/fear-greed": 2,
@@ -141,6 +155,29 @@ const TIER: Record<string, number> = {
     "surf#onchain/sql/preflight": 4,
     "surf#onchain/tx": 2,
     "surf#onchain/yield/ranking": 2,
+    "surf#prediction-market/analytics": 4,
+    "surf#prediction-market/correlations": 4,
+    "surf#prediction-market/kalshi/events": 4,
+    "surf#prediction-market/kalshi/markets": 4,
+    "surf#prediction-market/kalshi/open-interest": 4,
+    "surf#prediction-market/kalshi/orderbooks": 4,
+    "surf#prediction-market/kalshi/prices": 4,
+    "surf#prediction-market/kalshi/trades": 4,
+    "surf#prediction-market/kalshi/volumes": 4,
+    "surf#prediction-market/matching/daily": 4,
+    "surf#prediction-market/matching/pairs": 4,
+    "surf#prediction-market/polymarket/events": 4,
+    "surf#prediction-market/polymarket/leaderboard": 4,
+    "surf#prediction-market/polymarket/markets": 4,
+    "surf#prediction-market/polymarket/open-interest": 4,
+    "surf#prediction-market/polymarket/orderbooks": 4,
+    "surf#prediction-market/polymarket/positions": 4,
+    "surf#prediction-market/polymarket/price-ohlcv": 4,
+    "surf#prediction-market/polymarket/prices": 4,
+    "surf#prediction-market/polymarket/smart-money": 4,
+    "surf#prediction-market/polymarket/trades": 4,
+    "surf#prediction-market/polymarket/volume-split": 4,
+    "surf#prediction-market/polymarket/volumes": 4,
     "surf#project/ai-news": 2,
     "surf#project/defi/metrics": 2,
     "surf#project/defi/ranking": 2,
@@ -186,6 +223,9 @@ const FAMILY_REPRESENTATIVES = [
     "surf#project/ai-news",
     "surf#onchain/bridge/ranking",
     "surf#dex/token/price",
+    "surf#prediction-market/analytics",
+    "surf#hyperliquid/account",
+    "surf#heatscore/detail",
 ] as const;
 
 // ---------------------------------------------------------------------------
@@ -194,15 +234,15 @@ const FAMILY_REPRESENTATIVES = [
 
 Deno.test("surf docs: every endpoint is in the tier table", async () => {
     const ids = await surfIds();
-    assertEquals(ids.length, 68);
+    assertEquals(ids.length, 105);
     // a new endpoint must state its tier
     assertEquals(Object.keys(TIER).sort(), ids);
-    // 25 Light, 35 Standard, 8 Heavy — v1's split
+    // 25 Light, 35 Standard, 45 Heavy — v1's split
     const byTier = ids.reduce<Record<number, number>>((acc, id) => {
         acc[TIER[id]] = (acc[TIER[id]] ?? 0) + 1;
         return acc;
     }, {});
-    assertEquals(byTier, { 1: 25, 2: 35, 4: 8 });
+    assertEquals(byTier, { 1: 25, 2: 35, 4: 45 });
 });
 
 Deno.test("surf docs: one auth, one error digest, no consolidate, synthesized quantities, one lifecycle", async () => {
@@ -264,10 +304,21 @@ Deno.test("surf docs: one auth, one error digest, no consolidate, synthesized qu
             );
         }
     }
-    // the version segment rides the base URL
+    // the version segment rides the base URL; the {condition_id} placeholder
+    // survives into the compiled url while the PUBLIC identity is brace-free
     assertEquals(
         bundle.endpoints["surf#market/price"].request.url,
         "https://api.asksurf.ai/gateway/v1/market/price",
+    );
+    assertEquals(
+        bundle.endpoints["surf#prediction-market/polymarket/price-ohlcv"]
+            .request.url,
+        "https://api.asksurf.ai/gateway/v1/prediction-market/polymarket/price-ohlcv/{condition_id}",
+    );
+    assertEquals(
+        bundle.endpoints["surf#prediction-market/polymarket/volume-split"]
+            .request.url,
+        "https://api.asksurf.ai/gateway/v1/prediction-market/polymarket/volume-split/{condition_id}",
     );
 });
 
@@ -295,6 +346,24 @@ Deno.test("surf meta: the credits_used caveat rides every doc; identifier rules 
             "exactly one of `project` or `address`",
         ),
     );
+    assert(
+        notesOf("surf#heatscore/detail").includes(
+            "with neither or with both is rejected",
+        ),
+    );
+    // the vendor's field-combination rules ride notes (CodeRabbit #24)
+    const COMBINATION_NOTES: Record<string, string> = {
+        "surf#hyperliquid/fills": "`cursor` travels alone",
+        "surf#hyperliquid/trades": "`cursor` travels alone",
+        "surf#hyperliquid/trades/aggregate": "`fill_gaps=true` needs `from`",
+        "surf#prediction-market/polymarket/smart-money":
+            "only for `view=trades`",
+        "surf#prediction-market/polymarket/trades":
+            "`type=redemption` and `type=all` need `address`",
+    };
+    for (const [id, phrase] of Object.entries(COMBINATION_NOTES)) {
+        assert(notesOf(id).includes(phrase), id);
+    }
     assert(!notesOf("surf#news/feed").includes("Pass"), "no rule, no note");
 });
 
@@ -344,7 +413,7 @@ Deno.test("surf schemas: vendor defaults ride the binding; a union arm carries n
 });
 
 // ---------------------------------------------------------------------------
-// the synchronous relays
+// the 104 synchronous relays
 // ---------------------------------------------------------------------------
 
 Deno.test("surf: every relay settles its published tier on a 2xx and relays meta.credits_used", async () => {
@@ -368,10 +437,12 @@ Deno.test("surf: every relay settles its published tier on a 2xx and relays meta
         // the vendor's own meter stays in the body, verbatim (design D1):
         // the output carries whatever the fixture said, not the tier
         const output = result.output as { meta?: { credits_used?: number } };
+        // (the four v2-shaped prediction-market docs carry no `meta` at all
+        // — design D1 — so both sides are undefined there)
         const wire = fixture.calls[0].res.body as {
-            meta: { credits_used: number };
+            meta?: { credits_used: number };
         };
-        assertEquals(output.meta?.credits_used, wire.meta.credits_used, id);
+        assertEquals(output.meta?.credits_used, wire.meta?.credits_used, id);
     }
     // web/fetch is the measured divergent case (v1 drill: reports 2, charged
     // 1) — the one fixture whose meter differs from the tier
@@ -466,6 +537,22 @@ Deno.test("surf schema gates: enum, pattern, url and the identifier alternatives
     await validates("surf#fund/detail", { queryParams: { q: "a16z" } });
     await validates("surf#fund/detail", {
         queryParams: { id: "ef3b6da9-283d-4080-b3c7-87b1b45924dc" },
+    });
+    // exactly one of id | project_slug (vendor: "Pass exactly one"): both
+    // together is rejected before the wire, either alone passes
+    await assertRejects(
+        () =>
+            validates("surf#heatscore/detail", {
+                queryParams: {
+                    id: "ef3b6da9-283d-4080-b3c7-87b1b45924dc",
+                    project_slug: "synapse",
+                },
+            }),
+        Error,
+        "INVALID_INPUT",
+    );
+    await validates("surf#heatscore/detail", {
+        queryParams: { project_slug: "synapse" },
     });
     // exactly one of project | address: neither AND both are rejected
     // before the wire (each arm omits the other identifier, design D4)
