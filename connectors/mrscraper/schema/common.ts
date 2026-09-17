@@ -14,8 +14,9 @@ import { z } from "zod";
  * Matching is two-speed, as v1's: the HOST is strict — the brand must be
  * the REGISTRABLE label, i.e. the second-to-last label (`amazon.com`,
  * `smile.amazon.de`) or the third-to-last under a second-level public
- * suffix (`amazon.co.uk`, `lazada.com.my`); `amazon.attacker.example`
- * does not match. The PATH is lenient: a `pathPattern` (a regex source
+ * suffix (`amazon.co.uk`, `lazada.com.my` — the country label is exactly
+ * two letters, tighter than v1, so `amazon.com.evil` does not pass);
+ * `amazon.attacker.example` does not match. The PATH is lenient: a `pathPattern` (a regex source
  * matched from the first `/` after the host) only where the site's URL
  * format is unambiguous.
  */
@@ -39,7 +40,7 @@ export function siteUrl(i: {
         ).join("");
     const brands = i.brands.map(label).join("|");
     const suffix =
-        "(?:[A-Za-z]{2,}|(?:ac|co|com|edu|gov|net|org)\\.[A-Za-z]{2,})";
+        "(?:[A-Za-z]{2,}|(?:ac|co|com|edu|gov|net|org)\\.[A-Za-z]{2})";
     const host = `(?:[A-Za-z0-9-]+\\.)*(?:${brands})\\.${suffix}(?::\\d+)?`;
     const path = i.pathPattern ?? "(?:[/?#]|$)";
     const pattern = new RegExp(`^https?://${host}${path}\\S*$`);
@@ -52,6 +53,21 @@ export function siteUrl(i: {
 
 /** A marketplace scraper body that is just the gated URL. */
 export const urlOnlyBody = (url: z.ZodType) => z.object({ url }).strict();
+
+/** A Lazada page on any Lazada country site (the category and the product
+ *  scrapers). */
+export const zLazadaUrl = siteUrl({
+    site: "Lazada",
+    brands: ["lazada"],
+    example: "https://www.lazada.sg/products/pdp-i3158507329-s22328619522.html",
+});
+
+/** US ZIP or postal code the vendor applies before loading a store page so
+ *  price and availability reflect that location (the CVS, Home Depot,
+ *  Kroger, and Meijer scrapers). */
+export const zZipCode = z.string().min(3).describe(
+    "ZIP or postal code used for localized pricing and availability.",
+);
 
 /** Any page URL (the playground scrapes anything). */
 export const zAnyPageUrl = z.string().regex(/^https?:\/\/\S+$/).describe(
