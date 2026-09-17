@@ -1,0 +1,383 @@
+import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
+import { z } from "zod";
+import { zOrbitSearchBody } from "./schema/inputs.ts";
+
+/**
+ * `POST /v3/search` — find people, and come back with their context.
+ *
+ * ASYNC. The submit answers `202` with a snapshot carrying `search_id` and
+ * `status: "running"`; the lifecycle polls `GET /v3/search/{search_id}` until
+ * the status is terminal, so ONE monid run returns finished work. A search
+ * that Orbit can answer from what it already knows answers `200` on the
+ * submit and settles without a single poll.
+ *
+ * WHY THE POLL WATCHES: the public snapshot reports what a search FOUND, and
+ * Orbit's rate card prices what a search BUILT. A result that arrives `ready`
+ * was there to be read; a result seen `generating` or `enriching` on any tick
+ * is one Orbit worked on, and that is the line that draws 5 or 10 credits.
+ * The poll therefore accumulates the ids it observed mid-build into the
+ * fn-owned `state.data.built` bag — which is exactly what that bag is for:
+ * billing signals, never payloads — and `evidence` settles the depth line
+ * from it.
+ *
+ * That derivation is a TRUE LOWER BOUND, deliberately. A profile built
+ * entirely between two ticks is only ever seen `ready`, so it settles as an
+ * index hit. Scaling the count up to cover it would invent work we did not
+ * observe, and D27 is explicit that unobserved entries are omitted rather
+ * than guessed. The exact fix is a vendor claim: the moment an Orbit snapshot
+ * carries its own settled charge, a `usage.consolidate` reading that field
+ * wins over this fold and the bound stops mattering.
+ *
+ * ESTIMATE IS THE CEILING the caller authorized, and it is worth reading
+ * before running: `limit: 100, profile_depth: "full"` authorizes up to 1,010
+ * credits, because every one of those hundred people might be a profile Orbit
+ * has to build from live sources. Typical searches settle far below it —
+ * `limit: 10` at partial depth over people Orbit can answer for is 1 credit —
+ * and the gap between the two numbers is the whole reason `estimate` exists.
+ */
+export default defineEndpoint({
+    meta: {
+        displayName: "Orbit People Search",
+        summary:
+            "Find people and get the deepest available context about each one.",
+        description: "Find people and come back with deep, source-backed " +
+            "context about each of them. Describe who you want in plain " +
+            "English (`the founder of Anthropic`, `machine learning " +
+            "engineers in Brooklyn who write about music`), pass structured " +
+            "criteria in `intent`, or hand over what you already know in " +
+            "`signals` — an email, a phone number, a street address, a " +
+            "profile URL, a social handle. Any one of `query`, `intent` or " +
+            "`signals` is enough, and they combine. Each ready result " +
+            "carries identity and contact fields plus generated sections on " +
+            "the person's background, interests and recent activity, every " +
+            "claim attributed to the source it came from. `profile_depth` " +
+            "picks how deep to go: `partial` answers in seconds, `full` " +
+            "builds the deepest profile Orbit can and takes minutes. Set " +
+            "`candidate_discovery: true` when a signal belongs to several " +
+            "people — an address, a shared phone — and you want each of " +
+            "them resolved. This endpoint runs the whole search and returns " +
+            "the finished snapshot; read `orbit#v3/search/{search_id}` " +
+            "instead to follow a search yourself. Pricing follows the " +
+            "results: 1 credit per 10 people returned from the Orbit index, " +
+            "1 per person candidate discovery resolves, and 5 (partial) or " +
+            "10 (full) for each profile Orbit builds for you. Read " +
+            "`estimate` before a large or full-depth run.",
+        docsUrl: "https://docs.orbitsearch.com/api/search",
+        categories: ["people-enrichment"],
+    },
+    request: { method: "POST", path: "/v3/search" },
+    input: {
+        schema: {
+            // Orbit's own documented defaults, applied at the binding (D25 —
+            // the mirror carries optionality only). `limit` and
+            // `candidate_discovery_limit` are the limiting knobs, and both
+            // are vendor-published, so the estimate reads a concrete cap
+            // without a house constant.
+            body: zOrbitSearchBody.extend({
+                candidate_discovery: zOrbitSearchBody.shape.candidate_discovery
+                    .unwrap().default(false),
+                candidate_discovery_limit: zOrbitSearchBody.shape
+                    .candidate_discovery_limit.unwrap().default(10),
+                profile_depth: zOrbitSearchBody.shape.profile_depth.unwrap()
+                    .default("partial"),
+                include_profile: zOrbitSearchBody.shape.include_profile.unwrap()
+                    .default(true),
+                limit: zOrbitSearchBody.shape.limit.unwrap().default(20),
+            }),
+        },
+    },
+    /** A full-depth search over a hundred people builds profiles from live
+     *  sources; 15 minutes is the whole-run budget that work lives inside.
+     *  The individual requests are fast. */
+    timeouts: { requestMs: 60_000, runMs: 900_000, pollMs: 5_000 },
+    lifecycle: {
+        /** The billing signal threaded between ticks: every profile id this
+         *  run has seen Orbit working on. */
+        state: z.strictObject({
+            built: z.array(z.string()).describe(
+                "Profile ids observed mid-build on some tick — the results " +
+                    "Orbit built rather than read.",
+            ),
+        }),
+        start: async ({ utils, logger }) => {
+            const res = await utils.request();
+            if (res.status < 200 || res.status >= 300) {
+                // Orbit refused the request (400 bad input, 402 out of
+                // credits, 403 scope, 429 rate limit) — DATA, zero-billed.
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: res.status,
+                    output: res.body,
+                };
+            }
+            const searchId = utils.json.optionalGet(res.body, "$.search_id");
+            if (typeof searchId !== "string" || searchId === "") {
+                throw new Error("Orbit did not return a search_id");
+            }
+            const results = utils.json.optionalGet(res.body, "$.results");
+            const built = [];
+            if (Array.isArray(results)) {
+                for (const row of results) {
+                    const id = utils.json.optionalGet(row, "$.profile_id");
+                    const state = utils.json.optionalGet(row, "$.status");
+                    if (
+                        typeof id === "string" &&
+                        (state === "generating" || state === "enriching")
+                    ) built.push(id);
+                }
+            }
+            const status = utils.json.optionalGet(res.body, "$.status");
+            if (status !== "running") {
+                // Orbit answered the whole search on the submit — a 200 with
+                // a terminal status, which is what a search over people it
+                // can already answer for looks like.
+                logger.info("orbit search settled on submit", {
+                    searchId,
+                    status: String(status),
+                });
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: status === "failed" ? 500 : res.status,
+                    ...(status === "failed"
+                        ? { providerHttpStatus: res.status }
+                        : {}),
+                    output: res.body,
+                    state: { externalRunId: searchId, data: { built } },
+                };
+            }
+            return {
+                kind: "RUNNING",
+                state: { externalRunId: searchId, data: { built } },
+            };
+        },
+        poll: async ({ data, utils, logger }) => {
+            const searchId = data.lifecycle.state.externalRunId;
+            if (searchId === undefined) {
+                throw Object.assign(
+                    new Error("orbit search poll without externalRunId"),
+                    { retriable: false },
+                );
+            }
+            const res = await utils.http({
+                method: "GET",
+                url: data.request.url + "/" + encodeURIComponent(searchId),
+            });
+            if (
+                res.status === 408 || res.status === 429 ||
+                res.status === 500 || res.status === 502 ||
+                res.status === 503 || res.status === 504
+            ) {
+                // The status LOOKUP failed, not the search. The search keeps
+                // running and keeps drawing credits, so declaring the run
+                // terminal here would abandon work Orbit still bills us for.
+                // RUNNING is also the honest answer: we could not read the
+                // state. Bounded by runMs.
+                logger.warn("orbit search status lookup transient", {
+                    searchId,
+                    status: res.status,
+                });
+                return { kind: "RUNNING", pollAfterMs: 15_000 };
+            }
+            if (res.status < 200 || res.status >= 300) {
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: res.status,
+                    output: res.body,
+                };
+            }
+            // Accumulate the build signal: WHOLE-STATE semantics (D21) mean
+            // the returned state replaces the previous one wholesale, so the
+            // previous ids are carried forward by hand.
+            const seen = data.lifecycle.state.data?.built ?? [];
+            const built = seen.slice();
+            const results = utils.json.optionalGet(res.body, "$.results");
+            if (Array.isArray(results)) {
+                for (const row of results) {
+                    const id = utils.json.optionalGet(row, "$.profile_id");
+                    const state = utils.json.optionalGet(row, "$.status");
+                    if (
+                        typeof id === "string" && !built.includes(id) &&
+                        (state === "generating" || state === "enriching")
+                    ) built.push(id);
+                }
+            }
+            const next = { externalRunId: searchId, data: { built } };
+            const status = utils.json.optionalGet(res.body, "$.status");
+            if (status === "running" || status === undefined) {
+                return { kind: "RUNNING", state: next };
+            }
+            if (status === "failed") {
+                // The SEARCH failed while the status route answered 200
+                // perfectly well — ours/theirs (design D12). Shaped like
+                // Orbit's own error envelope so the provider's fromError
+                // maps it with one mapper.
+                logger.warn("orbit search failed", { searchId });
+                const failure = utils.json.optionalGet(
+                    res.body,
+                    "$.candidate_discovery_failure",
+                );
+                const message = utils.json.optionalGet(
+                    failure ?? null,
+                    "$.message",
+                );
+                const code = utils.json.optionalGet(failure ?? null, "$.code");
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: 500,
+                    providerHttpStatus: 200,
+                    output: {
+                        status: "failed",
+                        error: {
+                            code: typeof code === "string"
+                                ? code
+                                : "search_failed",
+                            message:
+                                typeof message === "string" && message !== ""
+                                    ? message
+                                    : "Orbit search failed",
+                        },
+                        search_id: searchId,
+                    },
+                    state: next,
+                };
+            }
+            // `completed` and `completed_with_errors` both DELIVERED people,
+            // and Orbit charges for what it delivered — both settle as the
+            // success they are, with the vendor's snapshot handed back whole.
+            logger.info("orbit search settled", {
+                searchId,
+                status: String(status),
+            });
+            return {
+                kind: "COMPLETED",
+                httpStatus: 200,
+                output: res.body,
+                state: next,
+            };
+        },
+    },
+    usage: {
+        /** Orbit's published rate card (`GET /v2/developer/pricing`, version
+         *  2026-09-10) as the billing algebra: a search settles the sum of
+         *  the work it actually did. */
+        model: {
+            kind: UsageModelKind.COMPOSITE,
+            components: {
+                index_search: {
+                    kind: UsageModelKind.PER_UNIT,
+                    unit: Unit.RESULT,
+                    every: 10,
+                    consumes: { credit: "default", amount: 1 },
+                    label: "search results",
+                    description:
+                        "people the search returned from the Orbit index, " +
+                        "charged in blocks of ten",
+                },
+                candidate_discovery: {
+                    kind: UsageModelKind.PER_UNIT,
+                    unit: Unit.RESULT,
+                    consumes: { credit: "default", amount: 1 },
+                    label: "candidates discovered",
+                    description:
+                        "additional people resolved from an address, email " +
+                        "or phone number that belongs to several of them",
+                },
+                partial_profile: {
+                    kind: UsageModelKind.PER_UNIT,
+                    unit: Unit.RESULT,
+                    consumes: { credit: "default", amount: 5 },
+                    label: "partial profiles built",
+                    description:
+                        "profiles Orbit built to partial depth for this search",
+                },
+                full_profile: {
+                    kind: UsageModelKind.PER_UNIT,
+                    unit: Unit.RESULT,
+                    consumes: { credit: "default", amount: 10 },
+                    label: "full profiles built",
+                    description:
+                        "profiles Orbit built to full depth for this search",
+                },
+            },
+        },
+        /** THE CEILING the caller authorized. `limit` bounds the index
+         *  results and `candidate_discovery_limit` the discovered ones; the
+         *  depth line assumes the worst honest case, that every person the
+         *  search returns is one Orbit has to build. `candidate_discovery`
+         *  stays 0 here because the depth line dominates it per result —
+         *  Orbit charges a discovered person as a BUILD when it builds one,
+         *  and counting both would price the same person twice. */
+        estimate: ({ data }) => {
+            const body = data.input.body;
+            const discovered = body.candidate_discovery
+                ? body.candidate_discovery_limit
+                : 0;
+            const people = body.limit + discovered;
+            const depth = body.profile_depth === "full"
+                ? "full_profile"
+                : "partial_profile";
+            return {
+                counts: {
+                    index_search: body.limit,
+                    [depth]: people,
+                },
+            };
+        },
+        /** Settles on the TERMINAL snapshot, following Orbit's own precedence
+         *  — a built profile bills at its depth, and a person discovery
+         *  merely resolved bills 1:
+         *
+         *    index_search  every non-failed result the index answered for
+         *                  (`sources` carries "search"), in blocks of ten
+         *    depth line    results this run observed mid-build
+         *    discovery     the remaining results carrying "candidate_discovery"
+         *
+         *  `built` comes from the poll's observations rather than from the
+         *  snapshot, because the snapshot reports what a search FOUND and
+         *  never says which of those people it had to build. */
+        evidence: ({ data, utils }) => {
+            const observed = utils.json.optionalGet(
+                data.lifecycle?.state ?? null,
+                "$.data.built",
+            );
+            const built = Array.isArray(observed)
+                ? observed.map((id) => String(id))
+                : [];
+            const rows = utils.json.optionalGet(data.output, "$.results");
+            const depth =
+                utils.json.optionalGet(data.output, "$.profile_depth") ===
+                        "full"
+                    ? "full_profile"
+                    : "partial_profile";
+            let indexed = 0;
+            let discovered = 0;
+            let builtDelivered = 0;
+            if (Array.isArray(rows)) {
+                for (const row of rows) {
+                    const status = utils.json.optionalGet(row, "$.status");
+                    if (status === "failed") continue;
+                    const id = utils.json.optionalGet(row, "$.profile_id");
+                    const origins = utils.json.optionalGet(row, "$.sources");
+                    const names = Array.isArray(origins)
+                        ? origins.map((origin) => String(origin))
+                        : [];
+                    if (names.includes("search")) indexed += 1;
+                    if (typeof id === "string" && built.includes(id)) {
+                        builtDelivered += 1;
+                    } else if (names.includes("candidate_discovery")) {
+                        discovered += 1;
+                    }
+                }
+            }
+            return {
+                counts: {
+                    ...(indexed > 0 ? { index_search: indexed } : {}),
+                    ...(discovered > 0
+                        ? { candidate_discovery: discovered }
+                        : {}),
+                    ...(builtDelivered > 0 ? { [depth]: builtDelivered } : {}),
+                },
+            };
+        },
+    },
+});

@@ -1,0 +1,27 @@
+{
+    "name": "synthetic-population-quote",
+    "description": "The free quote: the exact credit price of a population search, plus the most people one covers and the pricing version used. Costs nothing, starts nothing. Synthetic.",
+    "calls": [
+        {
+            "req": {
+                "method": "POST",
+                "url": "{{request.url}}"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "population": {
+                        "kind": "company",
+                        "id": "1441",
+                        "name": "Northwind Instruments"
+                    },
+                    "size": 140,
+                    "profile_depth": "partial",
+                    "credits": 640,
+                    "max_people": 5000,
+                    "pricing_version": "2026-09-10"
+                }
+            }
+        }
+    ]
+}

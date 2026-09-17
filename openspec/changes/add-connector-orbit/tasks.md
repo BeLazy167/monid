@@ -1,0 +1,64 @@
+# Tasks: add-connector-orbit
+
+## 1. Drill the vendor surface
+
+- [x] 1.1 Capture the published v3 OpenAPI (`docs.orbitsearch.com/openapi.json`,
+      Orbit API 3.0.0): 22 routes, `SearchRequest`, `StructuredIntent`,
+      `IdentitySignals`, `EnrichRequest`, `BatchEnrichRequest`,
+      `PopulationRequest`, and the `{status, error: {code, message}}` envelope
+- [x] 1.2 Pin the rate card from `GET /v2/developer/pricing` (unauthenticated,
+      version `2026-09-10`): `profile_read` 1, `index_search` 1 per 10
+      results, `candidate_discovery` 1 per profile, `partial_profile` 5,
+      `full_profile` 10; packages flat at $0.01/credit
+- [x] 1.3 Establish that NO search or enrich response carries a meter — only
+      `population.credits_quoted` and a watcher run's `charge_amount` do
+- [x] 1.4 Settle the billing algebra against Orbit's own settle: an index hit
+      draws only its share of a block, a BUILT profile draws its depth line,
+      a discovered person Orbit did not build draws 1, and a profile already
+      at the requested depth draws nothing
+
+## 2. Provider
+
+- [x] 2.1 `provider.ts`: bearer auth, `https://api.orbitsearch.com` baseUrl,
+      timeouts, the `default` credit pool, `output.fromError` over
+      `{status, error: {code, message}}`; no lifecycle, no consolidate
+- [x] 2.2 `schema/person-query.ts`: the `StructuredIntent` / `IdentitySignals`
+      mirrors plus the shape shared by search and any future bulk item
+- [x] 2.3 `schema/population.ts`: the `PopulationSubject` mirror and the
+      shape shared by the population search and its quote
+
+## 3. Endpoints (8)
+
+- [x] 3.1 `search` — mirror + vendor defaults at the binding + lifecycle whose
+      poll accumulates the build signal + 4-line composite
+- [x] 3.2 `search-status` — path mirror, FREE
+- [x] 3.3 `profile-read` — declared identity `/v3/profile/{profile_id}`
+      (the vendor path is shared with the build), flat 1 credit
+- [x] 3.4 `enrich` — mirror + lifecycle following `links.status` + dispatch
+      signal + 2-line composite
+- [x] 3.5 `enrich-status` — path mirror, FREE
+- [x] 3.6 `enrich-batch` — mirror + fan-out lifecycle over child request ids
+- [x] 3.7 `population-search` — mirror, pass-through submit, settles on
+      `population.credits_quoted`
+- [x] 3.8 `population-quote` — mirror, FREE
+
+## 4. Fixtures + tests
+
+- [x] 4.1 13 provider-level chains (strategy v2), `synthetic-` prefixed until
+      recorded: search async / indexed / discovery / failed / transient,
+      enrich built / no-op / provider-error, batch, population search + quote,
+      profile read, search status read, shared provider error
+- [x] 4.2 21 replay tests, including the two zero-settle regressions the
+      connector exists to get right — a cached search and a no-op enrich
+- [x] 4.3 Estimate spot-checks against the published rate card
+- [ ] 4.4 Record real chains and run `deno task test:live` once the dedicated
+      provider key is in the platform's secret store
+
+## 5. Verification
+
+- [x] 5.1 `deno task fmt` · `lint` · `check` clean
+- [x] 5.2 `deno task test` — 971 passed, 0 failed
+- [x] 5.3 `deno task version:check` — no contract-surface change
+- [x] 5.4 Double-compile byte-identical
+- [x] 5.5 `deno task catalog endpoints --provider orbit` lists all 8, and
+      `catalog inspect` returns the approved copy and schemas
