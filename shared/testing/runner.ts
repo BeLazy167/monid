@@ -9,6 +9,7 @@ import {
     type SealedUnit,
     sealResourceUnit,
     sealUnit,
+    type Usage,
 } from "@shared/core";
 import {
     directTransport,
@@ -210,6 +211,29 @@ export async function loadResource(
         ...(opts.mode === "replay" ? { sleep: () => Promise.resolve() } : {}),
     });
     return await engine.loadResource(opts.unit);
+}
+
+/**
+ * The PRE-RUN estimate of a sealed unit — the settle-side twin of
+ * `runEndpoint`, so a connector can assert the promise it makes as well as the
+ * bill it renders.
+ *
+ * No fixture and no mode: `usage.estimate` is a PURE hook over the validated
+ * input, so there is nothing to replay. The transport rejects every call,
+ * which turns an estimate that reaches for IO into a test failure rather than
+ * a silent network hit (the same guard `deno task engine:estimate` uses).
+ */
+export async function estimateEndpoint(
+    unit: SealedUnit,
+    input: RunInput,
+): Promise<Usage> {
+    const loaded = await new Engine({
+        transport: {
+            execute: () =>
+                Promise.reject(new Error("estimate is pure — no IO allowed")),
+        },
+    }).load(unit);
+    return loaded.estimate(input);
 }
 
 /** Gate for live tests: `ignore: liveSkip("exa")`. */
