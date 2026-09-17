@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/signal/projects",
         categories: ["crypto-signals"],
     },
-    endpoint: "/heatscore/projects",
     request: { method: "GET", path: "/heatscore/projects" },
     input: {
         schema: {

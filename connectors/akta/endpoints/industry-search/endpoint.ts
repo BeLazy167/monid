@@ -16,7 +16,6 @@ export default defineEndpoint({
             "https://docs.akta.pro/api-reference/supporting-apis/industry-search",
         categories: ["company-enrichment"],
     },
-    endpoint: "/v1/industry/search",
     request: { method: "GET", path: "/v1/industry/search/" },
     input: { schema: { queryParams: zIndustrySearchQueryParams } },
     usage: {

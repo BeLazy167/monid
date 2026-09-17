@@ -20,7 +20,6 @@ export default defineEndpoint({
             "https://docs.context.dev/api-reference/web-extraction/extract",
         categories: ["web-extraction"],
     },
-    endpoint: "/web/extract",
     request: { method: "POST", path: "/web/extract" },
     input: { schema: { body: zExtractBody } },
     timeouts: { requestMs: 310_000, runMs: 310_000 },

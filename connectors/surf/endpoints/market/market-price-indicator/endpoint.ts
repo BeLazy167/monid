@@ -20,7 +20,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/price-indicator",
         categories: ["crypto-signals"],
     },
-    endpoint: "/market/price-indicator",
     request: { method: "GET", path: "/market/price-indicator" },
     input: {
         schema: {

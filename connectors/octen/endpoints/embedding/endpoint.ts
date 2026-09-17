@@ -21,7 +21,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.octen.ai/api-reference/embedding",
         categories: ["embeddings"],
     },
-    endpoint: "/embedding",
     request: { method: "POST", path: "/embedding" },
     input: {
         schema: {

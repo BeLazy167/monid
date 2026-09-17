@@ -22,7 +22,6 @@ export default defineEndpoint({
         // input schema as an `anyOf` (clay D13).
         notes: ["An unmatched company draws nothing."],
     },
-    endpoint: "/organizations/enrich",
     request: { method: "GET", path: "/organizations/enrich" },
     // Apollo's own rule (organization-enrichment reference, 2026-09-16):
     // "use domain, linkedin_url, or website to identify the company; name

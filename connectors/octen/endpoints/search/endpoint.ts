@@ -23,7 +23,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.octen.ai/api-reference/search",
         categories: ["web-search", "news-search"],
     },
-    endpoint: "/search",
     request: { method: "POST", path: "/search" },
     input: {
         schema: {

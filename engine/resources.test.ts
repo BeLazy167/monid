@@ -106,7 +106,6 @@ function resourceConnector(): ConnectorSource[] {
                         summary: "Makes a widget.",
                         categories: ["demo-search"],
                     },
-                    endpoint: "/widgets",
                     request: { method: "POST", path: "/widgets" },
                     input: {
                         schema: {
@@ -142,7 +141,6 @@ function resourceConnector(): ConnectorSource[] {
                         summary: "Uses a widget.",
                         categories: ["demo-search"],
                     },
-                    endpoint: "/widgets/use",
                     request: { method: "POST", path: "/widgets/use" },
                     input: {
                         schema: { body: z.object({ id: z.string() }) },
@@ -248,7 +246,6 @@ Deno.test("resources: utils.resources on an UNBOUND doc throws RESOURCES_UNDECLA
                     summary: "Touches the reader undeclared.",
                     categories: ["demo-search"],
                 },
-                endpoint: "/sneaky",
                 request: { method: "GET", path: "/sneaky" },
                 lifecycle: {
                     start: async ({ utils }) => {
@@ -315,7 +312,6 @@ Deno.test("resources: gated instances ride into lifecycle fns as data.resources[
                     summary: "Echoes the gated instance.",
                     categories: ["demo-search"],
                 },
-                endpoint: "/widgets/echo",
                 request: { method: "POST", path: "/widgets/echo" },
                 input: {
                     schema: { body: z.object({ id: z.string() }) },
@@ -405,7 +401,6 @@ Deno.test("resources: utils.sleep is bounded — a per-call breach is FN_CONTRAC
                     summary: "Sleeps too long.",
                     categories: ["demo-search"],
                 },
-                endpoint: "/sleepy",
                 request: { method: "GET", path: "/sleepy" },
                 lifecycle: {
                     start: async ({ utils }) => {

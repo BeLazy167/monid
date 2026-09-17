@@ -222,9 +222,11 @@ plus ONE pure `route(delivery) → {who, what}` fn — who ∈ resource / alias 
 / unhandled, what ∈ `run` / `signal-run` / `refresh` / `ignore`. No `subscribe`
 = manual registration — the host logs the callback URL to paste (saperly).
 
-Identity is guarded twice: `endpoint:` is REQUIRED on endpoint defs (never
-derived from `request.path`) and `connectors/ids.lock.json` commits every
-published id — `deno task ids:check [--update]` fails on drift. The LOCAL host
+Identity is guarded by the lock: an endpoint id defaults to `request.path`
+(trailing slashes stripped; declare `endpoint:` only when the native path is
+transport plumbing or empty), and `connectors/ids.lock.json` commits every
+published id — `deno task ids:check [--update]` fails on drift, so a vendor
+route move under a derived identity breaks CI instead of renaming silently. The LOCAL host
 loop: `deno task engine:run` persists provisions/releases in a Deno KV store at
 `.output/local.db` (its default ownership window; `--resources <file>` swaps in
 a fixture window), and `deno task webhook simulate|listen` signs / verifies /

@@ -45,7 +45,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/hyperliquid/orders",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/orders",
     request: { method: "GET", path: "/hyperliquid/orders" },
     input: {
         schema: {

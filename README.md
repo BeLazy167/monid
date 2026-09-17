@@ -150,6 +150,8 @@ deno task catalog endpoints --category web-search
 deno task catalog inspect 'exa#search'       # one endpoint's full contract
 ```
 
+
+
 ```
 connectors/<name>/
 ├── provider.ts                    # defineProvider: name, meta, auth, defaults

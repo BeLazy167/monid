@@ -254,15 +254,17 @@ export async function compileBundle(
             const endpointFile = `${where}/endpoint.ts`;
             const def = parseDoc(zEndpointDef, rawDef, endpointFile);
 
-            // ---- PUBLIC identity (design D22/D46): the def's DECLARED
-            // `endpoint` path — never derived (folder names are
-            // ORGANIZATIONAL only, request paths are plumbing). id =
-            // provider# + the path minus its leading slash
-            // ("apify#apidojo/tweet-scraper").
+            // ---- PUBLIC identity (design D22): the def's `endpoint` path
+            // ?? request.path (trailing slashes stripped) — folder names
+            // are ORGANIZATIONAL only, never identity. id = provider# +
+            // the path minus its leading slash ("apify#apidojo/tweet-scraper").
+            // Ids are guarded by connectors/ids.lock.json (`ids:check`),
+            // so a derived identity drifting with a vendor route move
+            // fails CI instead of renaming silently.
             const endpointPath = parseDoc(
                 zEndpointPath,
-                def.endpoint,
-                `${endpointFile}#endpoint`,
+                def.endpoint ?? def.request.path.replace(/\/+$/, ""),
+                `${endpointFile}#endpoint (?? request.path)`,
             );
             const id = `${providerName}#${endpointPath.slice(1)}`;
             if (endpoints[id] !== undefined) {

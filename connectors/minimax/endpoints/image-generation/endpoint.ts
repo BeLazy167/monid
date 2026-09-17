@@ -35,7 +35,6 @@ export default defineEndpoint({
             "https://platform.minimax.io/docs/api-reference/image-generation",
         categories: ["image-generation"],
     },
-    endpoint: "/v1/image_generation",
     request: { method: "POST", path: "/v1/image_generation" },
     input: {
         schema: {

@@ -16,7 +16,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/polymarket-open-interest",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/polymarket/open-interest",
     request: {
         method: "GET",
         path: "/prediction-market/polymarket/open-interest",

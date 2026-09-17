@@ -28,7 +28,6 @@ export default defineEndpoint({
             "https://docs.peopledatalabs.com/docs/reference-company-search-api",
         categories: ["company-enrichment"],
     },
-    endpoint: "/v5/company/search",
     request: { method: "POST", path: "/v5/company/search" },
     // `size` REQUIRED at the binding on BOTH variants (design D25; see
     // endpoints/person-search/endpoint.ts).

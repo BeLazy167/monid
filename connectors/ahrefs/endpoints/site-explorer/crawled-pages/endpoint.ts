@@ -22,7 +22,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/site-explorer/crawled-pages",
     request: { method: "GET", path: "/site-explorer/crawled-pages" },
     input: {
         schema: {

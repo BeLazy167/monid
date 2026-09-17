@@ -19,7 +19,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/site-explorer/backlinks-stats",
     request: { method: "GET", path: "/site-explorer/backlinks-stats" },
     input: {
         schema: {

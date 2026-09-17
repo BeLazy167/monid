@@ -21,7 +21,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/batch-analysis/batch-analysis",
     request: { method: "POST", path: "/batch-analysis/batch-analysis" },
     input: {
         schema: {

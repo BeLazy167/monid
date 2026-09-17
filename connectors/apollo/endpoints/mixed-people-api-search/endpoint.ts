@@ -21,7 +21,6 @@ export default defineEndpoint({
             "pages. Add filters to narrow the search.",
         ],
     },
-    endpoint: "/mixed_people/api_search",
     request: { method: "POST", path: "/mixed_people/api_search" },
     input: { schema: { queryParams: zPeopleSearchQueryParams } },
     /** 0 credits — https://docs.apollo.io/docs/api-pricing (2026-09-16):

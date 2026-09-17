@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/onchain/tx",
         categories: ["onchain-data"],
     },
-    endpoint: "/onchain/tx",
     request: { method: "GET", path: "/onchain/tx" },
     input: {
         schema: {

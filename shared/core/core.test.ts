@@ -383,7 +383,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
     const good = defineEndpoint({
         meta,
         request,
-        endpoint: "/x",
         input: { schema: { body } },
         usage: {
             model: {
@@ -418,7 +417,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -445,7 +443,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -472,7 +469,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -488,7 +484,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -506,7 +501,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -524,7 +518,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -544,7 +537,6 @@ Deno.test("typed defineEndpoint: the generics narrow (and reject) as designed", 
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -581,7 +573,6 @@ Deno.test("typed lifecycle.state: the declared schema types reads AND writes", (
     const good = defineEndpoint({
         meta,
         request,
-        endpoint: "/x",
         input: { schema: { body } },
         usage: {
             model: {
@@ -632,7 +623,6 @@ Deno.test("typed lifecycle.state: the declared schema types reads AND writes", (
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -660,7 +650,6 @@ Deno.test("typed lifecycle.state: the declared schema types reads AND writes", (
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { body } },
             usage: {
                 model: {
@@ -815,7 +804,6 @@ Deno.test("typed FREE model + typed queryParams: the D25 layer narrows as design
     const good = defineEndpoint({
         meta,
         request,
-        endpoint: "/x",
         input: {
             schema: { queryParams: queryParams.required({ limit: true }) },
         },
@@ -836,7 +824,6 @@ Deno.test("typed FREE model + typed queryParams: the D25 layer narrows as design
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { queryParams } },
             usage: {
                 model: { kind: UsageModelKind.FREE },
@@ -849,7 +836,6 @@ Deno.test("typed FREE model + typed queryParams: the D25 layer narrows as design
         defineEndpoint({
             meta,
             request,
-            endpoint: "/x",
             input: { schema: { queryParams } },
             usage: {
                 model: {

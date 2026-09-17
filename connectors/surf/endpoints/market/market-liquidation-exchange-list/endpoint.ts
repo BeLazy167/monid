@@ -20,7 +20,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/market/liquidation-exchange-list",
         categories: ["derivatives"],
     },
-    endpoint: "/market/liquidation/exchange-list",
     request: { method: "GET", path: "/market/liquidation/exchange-list" },
     input: {
         schema: {

@@ -29,7 +29,6 @@ export default defineEndpoint({
             "rejected before the wire.",
         ],
     },
-    endpoint: "/token/tokenomics",
     request: { method: "GET", path: "/token/tokenomics" },
     input: {
         schema: {

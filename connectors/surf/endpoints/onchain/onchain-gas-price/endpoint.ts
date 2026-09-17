@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/onchain/gas-price",
         categories: ["onchain-data"],
     },
-    endpoint: "/onchain/gas-price",
     request: { method: "GET", path: "/onchain/gas-price" },
     input: {
         schema: {

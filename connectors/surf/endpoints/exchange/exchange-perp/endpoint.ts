@@ -20,7 +20,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/exchange/perp",
         categories: ["derivatives"],
     },
-    endpoint: "/exchange/perp",
     request: { method: "GET", path: "/exchange/perp" },
     input: {
         schema: {

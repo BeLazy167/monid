@@ -21,7 +21,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/serp-overview/serp-overview",
     request: { method: "GET", path: "/serp-overview/serp-overview" },
     input: {
         schema: {

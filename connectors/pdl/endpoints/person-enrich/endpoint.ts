@@ -21,7 +21,6 @@ export default defineEndpoint({
     // The SDK's own wire form (14.1.1): GET, every parameter on the query
     // string. v1 declared POST + body because its relay only forwarded a
     // body on non-GET and the SDK did the real transport.
-    endpoint: "/v5/person/enrich",
     request: { method: "GET", path: "/v5/person/enrich" },
     input: { schema: { queryParams: zPdlPersonEnrichQueryParams } },
     usage: {

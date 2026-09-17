@@ -22,7 +22,6 @@ export default defineEndpoint({
             "address.",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/candles",
     request: { method: "GET", path: "/hyperliquid/candles" },
     input: {
         schema: {

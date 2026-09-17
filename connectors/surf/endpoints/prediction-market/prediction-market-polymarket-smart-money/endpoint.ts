@@ -24,7 +24,6 @@ export default defineEndpoint({
             "through and Surf answers it.",
         ],
     },
-    endpoint: "/prediction-market/polymarket/smart-money",
     request: {
         method: "GET",
         path: "/prediction-market/polymarket/smart-money",

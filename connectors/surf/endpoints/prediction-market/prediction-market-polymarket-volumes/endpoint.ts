@@ -23,7 +23,6 @@ export default defineEndpoint({
             "request with none is rejected before the wire.",
         ],
     },
-    endpoint: "/prediction-market/polymarket/volumes",
     request: { method: "GET", path: "/prediction-market/polymarket/volumes" },
     input: {
         schema: {

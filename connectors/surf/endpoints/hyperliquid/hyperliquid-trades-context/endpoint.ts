@@ -19,7 +19,6 @@ export default defineEndpoint({
             "omitted when the completed-trade source has no value.",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/trades/context",
     request: { method: "GET", path: "/hyperliquid/trades/context" },
     input: {
         schema: {

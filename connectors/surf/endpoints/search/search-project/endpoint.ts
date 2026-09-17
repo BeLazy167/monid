@@ -13,7 +13,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/search/project",
         categories: ["company-enrichment"],
     },
-    endpoint: "/search/project",
     request: { method: "GET", path: "/search/project" },
     input: {
         schema: {

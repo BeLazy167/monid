@@ -24,7 +24,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/site-explorer/organic-competitors",
     request: { method: "GET", path: "/site-explorer/organic-competitors" },
     input: {
         schema: {

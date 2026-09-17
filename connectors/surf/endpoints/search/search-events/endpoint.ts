@@ -23,7 +23,6 @@ export default defineEndpoint({
             "before the wire.",
         ],
     },
-    endpoint: "/search/events",
     request: { method: "GET", path: "/search/events" },
     input: {
         schema: {

@@ -24,7 +24,6 @@ export default defineEndpoint({
             "before the wire.",
         ],
     },
-    endpoint: "/fund/portfolio",
     request: { method: "GET", path: "/fund/portfolio" },
     input: {
         schema: {

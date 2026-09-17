@@ -21,7 +21,6 @@ export default defineEndpoint({
             "pages. Add filters to narrow the search.",
         ],
     },
-    endpoint: "/mixed_companies/search",
     request: { method: "POST", path: "/mixed_companies/search" },
     input: { schema: { queryParams: zOrganizationSearchQueryParams } },
     usage: {

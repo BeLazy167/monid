@@ -18,7 +18,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/polymarket-leaderboard",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/polymarket/leaderboard",
     request: {
         method: "GET",
         path: "/prediction-market/polymarket/leaderboard",

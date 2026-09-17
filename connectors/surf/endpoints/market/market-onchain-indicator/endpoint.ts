@@ -22,7 +22,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/onchain-indicator",
         categories: ["crypto-signals"],
     },
-    endpoint: "/market/onchain-indicator",
     request: { method: "GET", path: "/market/onchain-indicator" },
     input: {
         schema: {

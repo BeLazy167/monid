@@ -28,7 +28,6 @@ export default defineEndpoint({
         docsUrl: "https://developers.clay.com/searches/advanced",
         categories: ["people-enrichment", "company-enrichment"],
     },
-    endpoint: "/search/query-mode/reference",
     request: { method: "GET", path: "/search/query-mode/reference" },
     lifecycle: {
         /** Plain relay — the sync shape the engine would run declaratively

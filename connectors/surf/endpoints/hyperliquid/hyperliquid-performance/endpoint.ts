@@ -35,7 +35,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/hyperliquid/performance",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/performance",
     request: { method: "GET", path: "/hyperliquid/performance" },
     input: {
         schema: {

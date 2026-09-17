@@ -24,7 +24,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/site-explorer/broken-backlinks",
     request: { method: "GET", path: "/site-explorer/broken-backlinks" },
     input: {
         schema: {

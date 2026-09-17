@@ -26,7 +26,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/matching-pairs",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/matching/pairs",
     request: { method: "GET", path: "/prediction-market/matching/pairs" },
     input: {
         schema: {

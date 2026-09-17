@@ -33,7 +33,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/prediction-market/analytics",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/analytics",
     request: { method: "GET", path: "/prediction-market/analytics" },
     input: {
         schema: {

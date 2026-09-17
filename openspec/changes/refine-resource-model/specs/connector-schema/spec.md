@@ -89,8 +89,10 @@ vocabularies. `verify.payload` SHALL be a template string containing
 
 ### Requirement: Explicit slugs
 `zResourceDef` SHALL carry a REQUIRED `slug` (kebab) and the loader SHALL
-assert folder === slug. The endpoint def `endpoint` field SHALL be
-REQUIRED (no request.path derivation).
+assert folder === slug. The endpoint def `endpoint` field SHALL remain
+OPTIONAL, defaulting to `request.path` with trailing slashes stripped
+(amended post-review: the ids.lock guard makes derived-id drift a CI
+failure, so requiring the field would only tax every def).
 
 #### Scenario: Folder/slug drift
 - **WHEN** `resources/phone-number/resource.ts` declares `slug: "phone"`

@@ -28,13 +28,15 @@ import {
  */
 export const zEndpointDef = z.strictObject({
     meta: zEndpointMeta,
-    /** PUBLIC endpoint identity — a native path (see zEndpointPath),
-     *  REQUIRED (design D46): identity is declared, never derived from
-     *  request plumbing (`?? request.path` invited silent renames when a
-     *  vendor moved a route). Conventionally request.path with trailing
-     *  slashes stripped; deviate when the native path is transport
-     *  plumbing (apify actor slugs) or empty (tinyfish). */
-    endpoint: zEndpointPath,
+    /** PUBLIC endpoint identity — a native path (see zEndpointPath).
+     *  ABSENT ⇒ request.path with trailing slashes stripped (the default
+     *  for plain HTTP providers). Declare it only when the native path is
+     *  transport plumbing (apify: the actor slug path, mechanically
+     *  derived from /v2/acts/{owner}~{name}/runs) or empty (tinyfish).
+     *  Either way the resulting id is PUBLIC API — committed to
+     *  connectors/ids.lock.json, so a drift (e.g. a vendor moving a
+     *  route under a derived identity) fails `deno task ids:check`. */
+    endpoint: zEndpointPath.optional(),
     request: zEndpointRequest,
     input: zInputSection.optional(),
     output: zOutputSection.optional(),

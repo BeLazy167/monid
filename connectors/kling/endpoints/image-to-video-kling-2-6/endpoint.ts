@@ -35,7 +35,6 @@ export default defineEndpoint({
             "and requires settings.resolution 1080p.",
         ],
     },
-    endpoint: "/image-to-video/kling-2.6",
     request: { method: "POST", path: "/image-to-video/kling-2.6" },
     input: {
         schema: {

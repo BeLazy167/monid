@@ -20,7 +20,6 @@ export default defineEndpoint({
             "before the wire.",
         ],
     },
-    endpoint: "/market/public-sale",
     request: { method: "GET", path: "/market/public-sale" },
     input: {
         schema: {

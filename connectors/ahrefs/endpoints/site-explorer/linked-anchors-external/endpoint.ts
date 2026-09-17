@@ -23,7 +23,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/site-explorer/linked-anchors-external",
     request: { method: "GET", path: "/site-explorer/linked-anchors-external" },
     input: {
         schema: {

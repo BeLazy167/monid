@@ -26,7 +26,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/search",
         categories: ["people-enrichment"],
     },
-    endpoint: "/v1/search",
     request: { method: "POST", path: "/v1/search" },
     // `num_results` REQUIRED at the binding (design D25 — the mirror stays
     // the faithful vendor contract, optional there): it is the estimate's

@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/token/dex-trades",
         categories: ["onchain-data"],
     },
-    endpoint: "/token/dex-trades",
     request: { method: "GET", path: "/token/dex-trades" },
     input: {
         schema: {

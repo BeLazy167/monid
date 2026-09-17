@@ -22,7 +22,6 @@ export default defineEndpoint({
         docsUrl: "https://exa.ai/docs/reference/get-contents",
         categories: ["web-scraping"],
     },
-    endpoint: "/contents",
     request: { method: "POST", path: "/contents" },
     input: {
         schema: {

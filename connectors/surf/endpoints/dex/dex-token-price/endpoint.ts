@@ -33,7 +33,6 @@ export default defineEndpoint({
             "one without the other is passed through, not rejected here.",
         ],
     },
-    endpoint: "/dex/token/price",
     request: { method: "GET", path: "/dex/token/price" },
     input: {
         schema: {

@@ -32,7 +32,6 @@ export default defineEndpoint({
         docsUrl: "https://exa.ai/docs/reference/search",
         categories: ["web-search"],
     },
-    endpoint: "/search",
     request: { method: "POST", path: "/search" },
     input: {
         schema: {

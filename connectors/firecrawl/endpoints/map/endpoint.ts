@@ -38,7 +38,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.firecrawl.dev/api-reference/endpoint/map",
         categories: ["web-scraping"],
     },
-    endpoint: "/map",
     request: { method: "POST", path: "/map" },
     input: { schema: { body: zMapBody } },
     usage: {

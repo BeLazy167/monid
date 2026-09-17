@@ -21,7 +21,6 @@ export default defineEndpoint({
             "b-roll, storyboards, concept previews.",
         categories: ["video-generation"],
     },
-    endpoint: "/text-to-video/kling-2.5-turbo",
     request: { method: "POST", path: "/text-to-video/kling-2.5-turbo" },
     input: {
         schema: {

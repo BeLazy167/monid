@@ -44,8 +44,8 @@
 ## 5. Slugs + identity lock (W5)
 
 - [x] 5.1 ResourceDef required `slug` (loader folder===slug); endpoint
-      `endpoint:` required + def sweep across all connectors (docs
-      byte-identical).
+      `endpoint:` stays optional (`?? request.path` default kept —
+      amended post-review; the ids.lock is the rename guard).
 - [x] 5.2 `connectors/ids.lock.json` + `scripts/ids-check.ts`
       (`deno task ids:check [--update]`).
 

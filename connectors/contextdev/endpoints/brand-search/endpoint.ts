@@ -19,7 +19,6 @@ export default defineEndpoint({
             "https://docs.context.dev/api-reference/brand-intelligence/search",
         categories: ["company-enrichment"],
     },
-    endpoint: "/brand/search",
     request: { method: "GET", path: "/brand/search" },
     input: { schema: { queryParams: zBrandSearchQueryParams } },
     /** 0 credits on the Pro plan Monid buys on —

@@ -21,7 +21,6 @@ export default defineEndpoint({
     },
     // GET with query parameters — the SDK's own wire form (see
     // endpoints/person-enrich/endpoint.ts).
-    endpoint: "/v5/company/enrich",
     request: { method: "GET", path: "/v5/company/enrich" },
     input: { schema: { queryParams: zPdlCompanyEnrichQueryParams } },
     usage: {

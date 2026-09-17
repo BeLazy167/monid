@@ -25,7 +25,6 @@ export default defineEndpoint({
             "cursor page is its own run and bills its own articles.",
         ],
     },
-    endpoint: "/news/search",
     request: { method: "POST", path: "/news/search" },
     // `limit` REQUIRED at the binding (design D25): it is the estimate's
     // whole basis, so the caller states it.

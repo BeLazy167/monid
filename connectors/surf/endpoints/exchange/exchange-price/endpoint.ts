@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/exchange/price",
         categories: ["token-prices"],
     },
-    endpoint: "/exchange/price",
     request: { method: "GET", path: "/exchange/price" },
     input: {
         schema: {

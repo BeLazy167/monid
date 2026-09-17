@@ -23,7 +23,6 @@ export default defineEndpoint({
             "upstream; the response's own credit count settles it.",
         ],
     },
-    endpoint: "/web/crawl",
     request: { method: "POST", path: "/web/crawl" },
     // `maxPages` REQUIRED at the binding (design D25 — the mirror stays
     // the faithful vendor contract, optional there): it is the estimate's

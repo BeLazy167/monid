@@ -23,7 +23,6 @@ export default defineEndpoint({
             "settles it.",
         ],
     },
-    endpoint: "/web/search",
     request: { method: "POST", path: "/web/search" },
     // `numResults` REQUIRED at the binding (design D25): it is the
     // estimate's whole basis, so the caller states it.

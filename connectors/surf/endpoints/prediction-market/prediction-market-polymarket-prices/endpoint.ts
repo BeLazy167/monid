@@ -18,7 +18,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/polymarket-prices",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/polymarket/prices",
     request: { method: "GET", path: "/prediction-market/polymarket/prices" },
     input: {
         schema: {

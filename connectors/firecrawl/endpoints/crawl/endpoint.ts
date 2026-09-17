@@ -59,7 +59,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.firecrawl.dev/api-reference/endpoint/crawl-post",
         categories: ["web-scraping"],
     },
-    endpoint: "/crawl",
     request: { method: "POST", path: "/crawl" },
     input: {
         schema: {

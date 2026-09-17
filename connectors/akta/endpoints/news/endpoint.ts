@@ -26,7 +26,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.akta.pro/api-reference/news-signals",
         categories: ["company-news", "news-search", "funding-data"],
     },
-    endpoint: "/v1/news",
     request: { method: "GET", path: "/v1/news/" },
     // `limit` REQUIRED at the binding (design D25 — the mirror stays the
     // faithful vendor contract, optional there): it is the estimate's

@@ -27,7 +27,6 @@ export default defineEndpoint({
             "with neither or with both is rejected before the wire.",
         ],
     },
-    endpoint: "/onchain/dex/activity",
     request: { method: "GET", path: "/onchain/dex/activity" },
     input: {
         schema: {

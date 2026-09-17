@@ -20,7 +20,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/exchange/klines",
         categories: ["token-prices"],
     },
-    endpoint: "/exchange/klines",
     request: { method: "GET", path: "/exchange/klines" },
     input: {
         schema: {

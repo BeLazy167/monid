@@ -14,7 +14,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/onchain/yield-ranking",
         categories: ["yields"],
     },
-    endpoint: "/onchain/yield/ranking",
     request: { method: "GET", path: "/onchain/yield/ranking" },
     input: {
         schema: {

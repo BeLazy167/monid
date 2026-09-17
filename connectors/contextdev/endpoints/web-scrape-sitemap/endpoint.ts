@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.context.dev/api-reference/web-scraping/sitemap",
         categories: ["web-extraction"],
     },
-    endpoint: "/web/scrape/sitemap",
     request: { method: "GET", path: "/web/scrape/sitemap" },
     input: { schema: { queryParams: zScrapeSitemapQueryParams } },
     usage: {

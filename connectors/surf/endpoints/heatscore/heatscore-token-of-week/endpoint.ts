@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/signal/token-of-week",
         categories: ["crypto-signals"],
     },
-    endpoint: "/heatscore/token-of-week",
     request: { method: "GET", path: "/heatscore/token-of-week" },
     input: {
         schema: {

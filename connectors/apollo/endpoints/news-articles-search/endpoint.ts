@@ -16,7 +16,6 @@ export default defineEndpoint({
         categories: ["company-news", "company-enrichment"],
         notes: ["published_at[min] must not fall after published_at[max]."],
     },
-    endpoint: "/news_articles/search",
     request: { method: "POST", path: "/news_articles/search" },
     input: { schema: { queryParams: zNewsArticlesSearchQueryParams } },
     usage: {

@@ -15,7 +15,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/fear-greed",
         categories: ["crypto-signals"],
     },
-    endpoint: "/market/fear-greed",
     request: { method: "GET", path: "/market/fear-greed" },
     input: {
         schema: {

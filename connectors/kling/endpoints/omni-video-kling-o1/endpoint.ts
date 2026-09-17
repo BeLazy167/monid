@@ -51,7 +51,6 @@ export default defineEndpoint({
             "Media ids must be unique within the request.",
         ],
     },
-    endpoint: "/omni-video/kling-o1",
     request: { method: "POST", path: "/omni-video/kling-o1" },
     input: {
         schema: {

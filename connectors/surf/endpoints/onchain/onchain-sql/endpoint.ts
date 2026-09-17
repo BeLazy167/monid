@@ -35,7 +35,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/onchain/sql",
         categories: ["onchain-data"],
     },
-    endpoint: "/onchain/sql",
     request: { method: "POST", path: "/onchain/sql" },
     input: {
         schema: {

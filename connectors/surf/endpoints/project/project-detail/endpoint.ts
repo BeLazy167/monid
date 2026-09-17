@@ -39,7 +39,6 @@ export default defineEndpoint({
             "with none is rejected before the wire.",
         ],
     },
-    endpoint: "/project/detail",
     request: { method: "GET", path: "/project/detail" },
     input: {
         schema: {

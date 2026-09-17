@@ -22,7 +22,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/keywords-explorer/matching-terms",
     request: { method: "GET", path: "/keywords-explorer/matching-terms" },
     input: {
         schema: {

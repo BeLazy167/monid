@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/wallet/protocols",
         categories: ["onchain-data"],
     },
-    endpoint: "/wallet/protocols",
     request: { method: "GET", path: "/wallet/protocols" },
     input: {
         schema: {

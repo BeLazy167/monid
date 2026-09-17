@@ -41,7 +41,6 @@ export default defineEndpoint({
             "task, which bills nothing.",
         ],
     },
-    endpoint: "/motion-control/kling-2.6",
     request: { method: "POST", path: "/motion-control/kling-2.6" },
     input: {
         schema: {

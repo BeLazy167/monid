@@ -29,7 +29,6 @@ export default defineEndpoint({
             "through and Surf answers it.",
         ],
     },
-    endpoint: "/prediction-market/polymarket/trades",
     request: { method: "GET", path: "/prediction-market/polymarket/trades" },
     input: {
         schema: {

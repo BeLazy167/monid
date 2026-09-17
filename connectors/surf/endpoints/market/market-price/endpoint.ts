@@ -23,7 +23,6 @@ export default defineEndpoint({
             "one without the other is passed through, not rejected here.",
         ],
     },
-    endpoint: "/market/price",
     request: { method: "GET", path: "/market/price" },
     input: {
         schema: {

@@ -20,7 +20,6 @@ export default defineEndpoint({
             "may span at most 60 buckets upstream.",
         ],
     },
-    endpoint: "/keywords-explorer/volume-history",
     request: { method: "GET", path: "/keywords-explorer/volume-history" },
     input: {
         schema: {

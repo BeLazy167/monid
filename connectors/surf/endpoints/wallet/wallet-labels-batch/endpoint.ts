@@ -15,7 +15,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/wallet/labels-batch",
         categories: ["onchain-data"],
     },
-    endpoint: "/wallet/labels/batch",
     request: { method: "GET", path: "/wallet/labels/batch" },
     input: {
         schema: {

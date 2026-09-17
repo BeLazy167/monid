@@ -48,7 +48,6 @@ export default defineEndpoint({
             "alongside it is passed through and Surf answers it.",
         ],
     },
-    endpoint: "/hyperliquid/trades",
     request: { method: "GET", path: "/hyperliquid/trades" },
     input: {
         schema: {

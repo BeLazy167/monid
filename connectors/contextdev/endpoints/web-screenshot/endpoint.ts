@@ -23,7 +23,6 @@ export default defineEndpoint({
         // schema as an `anyOf` (clay D13).
         notes: ["page is only valid together with domain."],
     },
-    endpoint: "/web/screenshot",
     request: { method: "GET", path: "/web/screenshot" },
     // "domain or directUrl, but not both" is the vendor's rule (each
     // optional in its schema): each arm omits the other selector, so both

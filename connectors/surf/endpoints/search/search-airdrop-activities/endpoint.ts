@@ -14,7 +14,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/search/airdrop-activities",
         categories: ["onchain-data"],
     },
-    endpoint: "/search/airdrop/activities",
     request: { method: "GET", path: "/search/airdrop/activities" },
     input: {
         schema: {

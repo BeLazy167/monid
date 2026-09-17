@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.context.dev/api-reference/web-extraction/sic",
         categories: ["company-enrichment"],
     },
-    endpoint: "/web/sic",
     request: { method: "GET", path: "/web/sic" },
     input: { schema: { queryParams: zSicQueryParams } },
     usage: {

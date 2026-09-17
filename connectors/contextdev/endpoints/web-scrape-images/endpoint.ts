@@ -15,7 +15,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.context.dev/api-reference/web-scraping/images",
         categories: ["web-extraction"],
     },
-    endpoint: "/web/scrape/images",
     request: { method: "GET", path: "/web/scrape/images" },
     input: { schema: { queryParams: zScrapeImagesQueryParams } },
     usage: {

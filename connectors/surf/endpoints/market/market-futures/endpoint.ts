@@ -20,7 +20,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/futures",
         categories: ["derivatives"],
     },
-    endpoint: "/market/futures",
     request: { method: "GET", path: "/market/futures" },
     input: {
         schema: {

@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.context.dev/api-reference/web-extraction/naics",
         categories: ["company-enrichment"],
     },
-    endpoint: "/web/naics",
     request: { method: "GET", path: "/web/naics" },
     input: { schema: { queryParams: zNaicsQueryParams } },
     usage: {

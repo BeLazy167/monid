@@ -18,7 +18,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/keywords-explorer/volume-by-country",
     request: { method: "GET", path: "/keywords-explorer/volume-by-country" },
     input: {
         schema: {

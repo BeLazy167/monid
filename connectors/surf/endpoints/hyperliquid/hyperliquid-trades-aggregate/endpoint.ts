@@ -48,7 +48,6 @@ export default defineEndpoint({
             "`group_by=day` only; it is passed through and Surf answers it.",
         ],
     },
-    endpoint: "/hyperliquid/trades/aggregate",
     request: { method: "GET", path: "/hyperliquid/trades/aggregate" },
     input: {
         schema: {

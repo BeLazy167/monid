@@ -23,7 +23,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/token/transfer-stats",
         categories: ["onchain-data"],
     },
-    endpoint: "/token/transfer-stats",
     request: { method: "GET", path: "/token/transfer-stats" },
     input: {
         schema: {

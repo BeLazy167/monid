@@ -29,7 +29,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/liquidation-order",
         categories: ["derivatives"],
     },
-    endpoint: "/market/liquidation/order",
     request: { method: "GET", path: "/market/liquidation/order" },
     input: {
         schema: {

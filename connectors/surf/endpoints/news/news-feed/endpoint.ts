@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/news/feed",
         categories: ["news-search"],
     },
-    endpoint: "/news/feed",
     request: { method: "GET", path: "/news/feed" },
     input: {
         schema: {

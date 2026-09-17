@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/fund/ranking",
         categories: ["company-enrichment", "funding-data"],
     },
-    endpoint: "/fund/ranking",
     request: { method: "GET", path: "/fund/ranking" },
     input: {
         schema: {

@@ -21,7 +21,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.context.dev/api-reference/web-scraping/markdown",
         categories: ["web-extraction"],
     },
-    endpoint: "/web/scrape/markdown",
     request: { method: "GET", path: "/web/scrape/markdown" },
     input: { schema: { queryParams: zScrapeMarkdownQueryParams } },
     // v1's budget for a slow single-page render (PDF parsing included);

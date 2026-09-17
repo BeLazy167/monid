@@ -51,7 +51,6 @@ function demoConnector(): ConnectorSource[] {
                     summary: "Searches.",
                     categories: ["demo-search"],
                 },
-                endpoint: "/search",
                 request: { method: "POST", path: "/search" },
                 input: { schema: { body: z.object({ q: z.string().min(1) }) } },
                 output: {
@@ -537,7 +536,6 @@ Deno.test("hook fallback: endpoint fromResponse REPLACES the provider's", async 
             summary: "Searches.",
             categories: ["demo-search"],
         },
-        endpoint: "/search",
         request: { method: "POST", path: "/search" },
         input: { schema: { body: z.object({ q: z.string().min(1) }) } },
         output: {
@@ -580,7 +578,6 @@ Deno.test("D27 settle: consolidate PLUCKS the vendor meter before fromResponse; 
             summary: "Searches.",
             categories: ["demo-search"],
         },
-        endpoint: "/search",
         request: { method: "POST", path: "/search" },
         input: { schema: { body: z.object({ q: z.string().min(1) }) } },
         usage: {
@@ -1163,7 +1160,6 @@ function asyncConnector(): ConnectorSource[] {
                     summary: "Runs a job.",
                     categories: ["demo-search"],
                 },
-                endpoint: "/jobs",
                 request: { method: "POST", path: "/jobs" },
                 input: { schema: { body: z.object({ q: z.string() }) } },
             }),

@@ -25,7 +25,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/deals/list",
         categories: ["funding-data", "company-enrichment"],
     },
-    endpoint: "/deals",
     request: { method: "POST", path: "/deals" },
     // `page_size` REQUIRED and CAPPED at the binding (design D25 — the
     // mirror stays the faithful vendor contract, optional up to 500): it is

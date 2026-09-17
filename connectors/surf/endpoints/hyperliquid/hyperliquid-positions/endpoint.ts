@@ -28,7 +28,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/hyperliquid/positions",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/positions",
     request: { method: "GET", path: "/hyperliquid/positions" },
     input: {
         schema: {

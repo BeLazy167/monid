@@ -14,7 +14,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/kalshi-open-interest",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/kalshi/open-interest",
     request: { method: "GET", path: "/prediction-market/kalshi/open-interest" },
     input: {
         schema: {

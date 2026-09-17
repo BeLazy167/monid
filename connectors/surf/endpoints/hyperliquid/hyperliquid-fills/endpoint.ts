@@ -38,7 +38,6 @@ export default defineEndpoint({
             "a bad combination and a non-2xx is not charged.",
         ],
     },
-    endpoint: "/hyperliquid/fills",
     request: { method: "GET", path: "/hyperliquid/fills" },
     input: {
         schema: {

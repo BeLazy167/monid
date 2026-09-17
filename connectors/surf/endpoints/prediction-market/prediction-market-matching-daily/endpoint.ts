@@ -20,7 +20,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/matching-daily",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/matching/daily",
     request: { method: "GET", path: "/prediction-market/matching/daily" },
     input: {
         schema: {

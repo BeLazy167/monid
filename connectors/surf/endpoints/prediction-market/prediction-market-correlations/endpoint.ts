@@ -21,7 +21,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/correlations",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/correlations",
     request: { method: "GET", path: "/prediction-market/correlations" },
     input: {
         schema: {

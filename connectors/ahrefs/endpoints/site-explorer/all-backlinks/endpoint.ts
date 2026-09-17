@@ -22,7 +22,6 @@ export default defineEndpoint({
             "request — an empty result still draws 50.",
         ],
     },
-    endpoint: "/site-explorer/all-backlinks",
     request: { method: "GET", path: "/site-explorer/all-backlinks" },
     input: {
         schema: {

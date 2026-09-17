@@ -30,7 +30,6 @@ export default defineEndpoint({
         docsUrl: "https://console.suzanne3d.com/documentation/text-to-3d",
         categories: ["3d-generation"],
     },
-    endpoint: "/v1/generations/text-to-3d",
     request: { method: "POST", path: "/v1/generations/text-to-3d" },
     input: { schema: { body: zTextTo3dBody } },
     // ASYNC generation: a durable poll loop needs a large WHOLE-RUN budget

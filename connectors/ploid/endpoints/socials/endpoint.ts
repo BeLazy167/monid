@@ -22,7 +22,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/social",
         categories: ["people-enrichment"],
     },
-    endpoint: "/v1/socials",
     request: { method: "POST", path: "/v1/socials" },
     input: { schema: { body: zPloidSocialsBody } },
     usage: {

@@ -23,7 +23,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/ranking",
         categories: ["token-prices"],
     },
-    endpoint: "/market/ranking",
     request: { method: "GET", path: "/market/ranking" },
     input: {
         schema: {

@@ -26,7 +26,6 @@ export default defineEndpoint({
             "there is no audio switch.",
         ],
     },
-    endpoint: "/text-to-video/kling-3.0-turbo",
     request: { method: "POST", path: "/text-to-video/kling-3.0-turbo" },
     input: {
         schema: {

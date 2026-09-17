@@ -23,7 +23,6 @@ export default defineEndpoint({
             "assumes up to 250 rows.",
         ],
     },
-    endpoint: "/site-explorer/metrics-by-country",
     request: { method: "GET", path: "/site-explorer/metrics-by-country" },
     input: {
         schema: {

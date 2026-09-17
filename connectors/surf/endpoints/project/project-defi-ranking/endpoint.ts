@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/project/defi-ranking",
         categories: ["defi"],
     },
-    endpoint: "/project/defi/ranking",
     request: { method: "GET", path: "/project/defi/ranking" },
     input: {
         schema: {

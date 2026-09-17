@@ -19,7 +19,6 @@ export default defineEndpoint({
             "with neither or with both is rejected before the wire.",
         ],
     },
-    endpoint: "/heatscore/detail",
     request: { method: "GET", path: "/heatscore/detail" },
     input: {
         schema: {

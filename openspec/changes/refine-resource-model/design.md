@@ -143,9 +143,11 @@ releases → releases).
 - ResourceDef gains REQUIRED `slug` (kebab); the loader asserts
   folder === slug (the provider `name` pattern). Id stays
   `<provider>/<slug>`; folder inference dies.
-- Endpoint `endpoint:` becomes REQUIRED (the `?? request.path` derivation
-  dies) — a mechanical def sweep; compiled docs are unchanged, so
-  byte-identity holds for every released connector.
+- Endpoint `endpoint:` STAYS optional (`?? request.path`, trailing
+  slashes stripped — the default is reasonable and a required field
+  would tax every def). AMENDED post-review: an earlier revision made
+  it required + swept every def; reverted — the ids.lock below already
+  turns a silent derived-id drift into a CI failure.
 - Stability guard: a committed `connectors/ids.lock.json` (sorted
   provider/endpoint/resource/webhook ids) + `deno task ids:check` —
   verifies every locked id still compiles; removals/renames fail unless

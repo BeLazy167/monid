@@ -22,7 +22,6 @@ export default defineEndpoint({
             "unbilled 408 unless behavior is return-partial.",
         ],
     },
-    endpoint: "/brand/ai/products",
     request: { method: "POST", path: "/brand/ai/products" },
     input: { schema: { body: zProductsBody } },
     timeouts: { requestMs: 310_000, runMs: 310_000 },

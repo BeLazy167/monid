@@ -29,7 +29,6 @@ export default defineEndpoint({
             "before the wire.",
         ],
     },
-    endpoint: "/project/defi/metrics",
     request: { method: "GET", path: "/project/defi/metrics" },
     input: {
         schema: {

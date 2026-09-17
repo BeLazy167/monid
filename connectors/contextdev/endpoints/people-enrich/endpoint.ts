@@ -26,7 +26,6 @@ export default defineEndpoint({
             "addresses are rejected upstream with a 422 at no charge.",
         ],
     },
-    endpoint: "/people/enrich",
     request: { method: "POST", path: "/people/enrich" },
     // The vendor's minimum-clue rule — an email, a social profile URL, or
     // a name plus company, education, or location — bound as a union so it

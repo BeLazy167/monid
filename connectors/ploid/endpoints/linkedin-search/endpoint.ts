@@ -20,7 +20,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/social",
         categories: ["linkedin"],
     },
-    endpoint: "/v1/linkedin/search",
     request: { method: "POST", path: "/v1/linkedin/search" },
     // `limit` REQUIRED at the binding (design D25): the estimate's basis.
     input: {

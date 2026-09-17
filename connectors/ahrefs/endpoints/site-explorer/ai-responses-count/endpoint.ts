@@ -20,7 +20,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/site-explorer/ai-responses-count",
     request: { method: "GET", path: "/site-explorer/ai-responses-count" },
     input: {
         schema: {

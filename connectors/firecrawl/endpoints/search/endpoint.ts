@@ -42,7 +42,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.firecrawl.dev/api-reference/endpoint/search",
         categories: ["web-search"],
     },
-    endpoint: "/search",
     request: { method: "POST", path: "/search" },
     input: {
         schema: {

@@ -41,7 +41,6 @@ export default defineEndpoint({
             "regions.",
         ],
     },
-    endpoint: "/people/match",
     request: { method: "POST", path: "/people/match" },
     // "At least one identifier" is OUR rule (Apollo requires nothing), so
     // it binds HERE and the mirror stays vendor-faithful (design D25). A

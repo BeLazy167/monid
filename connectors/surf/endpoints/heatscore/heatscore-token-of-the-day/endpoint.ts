@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/signal/token-of-the-day",
         categories: ["crypto-signals"],
     },
-    endpoint: "/heatscore/token-of-the-day",
     request: { method: "GET", path: "/heatscore/token-of-the-day" },
     input: {
         schema: {

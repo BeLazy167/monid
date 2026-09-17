@@ -22,7 +22,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/token/transfer-counterparties",
         categories: ["onchain-data"],
     },
-    endpoint: "/token/transfer-counterparties",
     request: { method: "GET", path: "/token/transfer-counterparties" },
     input: {
         schema: {

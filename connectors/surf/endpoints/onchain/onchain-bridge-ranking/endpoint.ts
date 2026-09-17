@@ -15,7 +15,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/onchain/bridge-ranking",
         categories: ["defi"],
     },
-    endpoint: "/onchain/bridge/ranking",
     request: { method: "GET", path: "/onchain/bridge/ranking" },
     input: {
         schema: {

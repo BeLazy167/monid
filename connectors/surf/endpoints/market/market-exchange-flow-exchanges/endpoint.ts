@@ -24,7 +24,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/market/exchange-flow-exchanges",
         categories: ["token-prices"],
     },
-    endpoint: "/market/exchange-flow/exchanges",
     request: { method: "GET", path: "/market/exchange-flow/exchanges" },
     input: {
         schema: {

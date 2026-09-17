@@ -42,7 +42,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.firecrawl.dev/api-reference/endpoint/scrape",
         categories: ["web-scraping"],
     },
-    endpoint: "/scrape",
     request: { method: "POST", path: "/scrape" },
     input: { schema: { body: zScrapeBody } },
     usage: {

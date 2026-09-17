@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/social",
         categories: ["linkedin", "company-enrichment"],
     },
-    endpoint: "/v1/linkedin/companies/posts",
     request: { method: "GET", path: "/v1/linkedin/companies/posts" },
     input: {
         schema: { queryParams: zPloidLinkedinCompanyPostsQueryParams },

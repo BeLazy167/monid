@@ -18,7 +18,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/industries/search",
         categories: ["funding-data"],
     },
-    endpoint: "/industry/search",
     request: { method: "GET", path: "/industry/search" },
     input: { schema: { queryParams: zIndustrySearchQueryParams } },
     usage: {

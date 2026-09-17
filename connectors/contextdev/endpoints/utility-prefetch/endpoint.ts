@@ -19,7 +19,6 @@ export default defineEndpoint({
         categories: ["company-enrichment"],
         notes: ["Requires a paid Context.dev subscription (403 otherwise)."],
     },
-    endpoint: "/utility/prefetch",
     request: { method: "POST", path: "/utility/prefetch" },
     input: { schema: { body: zPrefetchBody } },
     timeouts: { requestMs: 310_000, runMs: 310_000 },

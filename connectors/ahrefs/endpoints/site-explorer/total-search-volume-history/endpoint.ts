@@ -22,7 +22,6 @@ export default defineEndpoint({
             "may span at most 60 buckets upstream.",
         ],
     },
-    endpoint: "/site-explorer/total-search-volume-history",
     request: {
         method: "GET",
         path: "/site-explorer/total-search-volume-history",

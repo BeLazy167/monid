@@ -21,7 +21,6 @@ export default defineEndpoint({
             "a routine pre-check.",
         categories: ["onchain-data"],
     },
-    endpoint: "/onchain/sql/preflight",
     request: { method: "POST", path: "/onchain/sql/preflight" },
     input: {
         schema: {

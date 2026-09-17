@@ -35,7 +35,6 @@ export default defineEndpoint({
             "/onchain/sql/preflight. Refresh: ~24h.",
         categories: ["onchain-data"],
     },
-    endpoint: "/onchain/sql/jobs",
     request: { method: "POST", path: "/onchain/sql/jobs" },
     input: {
         schema: {

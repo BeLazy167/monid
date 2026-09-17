@@ -21,7 +21,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/exchange/funding-history",
         categories: ["derivatives"],
     },
-    endpoint: "/exchange/funding-history",
     request: { method: "GET", path: "/exchange/funding-history" },
     input: {
         schema: {

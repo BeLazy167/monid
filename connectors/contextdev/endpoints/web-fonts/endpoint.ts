@@ -16,7 +16,6 @@ export default defineEndpoint({
             "https://docs.context.dev/api-reference/brand-intelligence/fonts",
         categories: ["web-extraction"],
     },
-    endpoint: "/web/fonts",
     request: { method: "GET", path: "/web/fonts" },
     // "domain or directUrl, but not both": each arm omits the other
     // selector, so both together match neither arm (clay D13; v1 `.refine`).

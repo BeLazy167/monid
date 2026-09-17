@@ -22,7 +22,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.akta.pro/api-reference/company-data",
         categories: ["company-enrichment", "funding-data"],
     },
-    endpoint: "/v1/company/enrichment",
     request: { method: "GET", path: "/v1/company/enrichment/" },
     // `sections` REQUIRED AT THE BINDING (design D24): the CREDIT estimate
     // is per-section arithmetic, so the knob must be deterministic after

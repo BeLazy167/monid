@@ -33,7 +33,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/agent",
         categories: ["agents"],
     },
-    endpoint: "/v1/agent",
     request: { method: "POST", path: "/v1/agent" },
     input: {
         // `max_acu` carries the VENDOR default (2, OpenAPI 2.0.0) so the

@@ -27,7 +27,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/wallet/transfers",
         categories: ["onchain-data"],
     },
-    endpoint: "/wallet/transfers",
     request: { method: "GET", path: "/wallet/transfers" },
     input: {
         schema: {

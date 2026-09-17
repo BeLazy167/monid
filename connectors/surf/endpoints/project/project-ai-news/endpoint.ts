@@ -25,7 +25,6 @@ export default defineEndpoint({
             "before the wire.",
         ],
     },
-    endpoint: "/project/ai-news",
     request: { method: "GET", path: "/project/ai-news" },
     input: {
         schema: {

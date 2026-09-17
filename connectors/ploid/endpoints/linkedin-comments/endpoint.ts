@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/social",
         categories: ["linkedin"],
     },
-    endpoint: "/v1/linkedin/profiles/comments",
     request: { method: "GET", path: "/v1/linkedin/profiles/comments" },
     input: { schema: { queryParams: zPloidLinkedinCommentsQueryParams } },
     usage: {

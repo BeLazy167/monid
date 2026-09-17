@@ -58,7 +58,6 @@ export default defineEndpoint({
             "input — five times the silent 720p rate.",
         ],
     },
-    endpoint: "/omni-video/kling-3.0-omni",
     request: { method: "POST", path: "/omni-video/kling-3.0-omni" },
     input: {
         schema: {

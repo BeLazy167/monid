@@ -40,7 +40,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.firecrawl.dev/api-reference/endpoint/agent",
         categories: ["web-scraping"],
     },
-    endpoint: "/agent",
     request: { method: "POST", path: "/agent" },
     input: {
         schema: {

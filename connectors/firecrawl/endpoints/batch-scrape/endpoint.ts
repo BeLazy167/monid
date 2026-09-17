@@ -36,7 +36,6 @@ export default defineEndpoint({
             "https://docs.firecrawl.dev/api-reference/endpoint/batch-scrape",
         categories: ["web-scraping"],
     },
-    endpoint: "/batch/scrape",
     request: { method: "POST", path: "/batch/scrape" },
     input: { schema: { body: zBatchScrapeBody } },
     timeouts: { requestMs: 30_000, runMs: 1_800_000, pollMs: 10_000 },

@@ -16,7 +16,6 @@ export default defineEndpoint({
             "https://docs.asksurf.ai/data-api/prediction-market/kalshi-orderbooks",
         categories: ["prediction-markets"],
     },
-    endpoint: "/prediction-market/kalshi/orderbooks",
     request: { method: "GET", path: "/prediction-market/kalshi/orderbooks" },
     input: {
         schema: {

@@ -19,7 +19,6 @@ export default defineEndpoint({
             "billable request; cache hits and explicit zero consumption are free.",
         ],
     },
-    endpoint: "/site-explorer/outlinks-stats",
     request: { method: "GET", path: "/site-explorer/outlinks-stats" },
     input: {
         schema: {

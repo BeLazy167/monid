@@ -29,7 +29,6 @@ export default defineEndpoint({
             "retry.",
         ],
     },
-    endpoint: "/brand/retrieve",
     request: { method: "POST", path: "/brand/retrieve" },
     input: { schema: { body: zBrandRetrieveBody } },
     timeouts: { requestMs: 310_000, runMs: 310_000 },

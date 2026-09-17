@@ -28,7 +28,6 @@ export default defineEndpoint({
             "Exactly one first_frame; Turbo accepts no last_frame.",
         ],
     },
-    endpoint: "/image-to-video/kling-3.0-turbo",
     request: { method: "POST", path: "/image-to-video/kling-3.0-turbo" },
     input: {
         schema: {

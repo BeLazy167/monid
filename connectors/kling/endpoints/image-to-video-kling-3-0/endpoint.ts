@@ -36,7 +36,6 @@ export default defineEndpoint({
             "five times the silent 720p rate.",
         ],
     },
-    endpoint: "/image-to-video/kling-3.0",
     request: { method: "POST", path: "/image-to-video/kling-3.0" },
     input: {
         schema: {

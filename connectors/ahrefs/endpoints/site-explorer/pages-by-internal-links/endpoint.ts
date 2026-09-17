@@ -22,7 +22,6 @@ export default defineEndpoint({
             "fields; anything else is rejected before the request.",
         ],
     },
-    endpoint: "/site-explorer/pages-by-internal-links",
     request: { method: "GET", path: "/site-explorer/pages-by-internal-links" },
     input: {
         schema: {

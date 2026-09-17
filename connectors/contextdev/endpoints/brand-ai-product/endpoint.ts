@@ -19,7 +19,6 @@ export default defineEndpoint({
             "https://docs.context.dev/api-reference/web-extraction/product",
         categories: ["web-extraction"],
     },
-    endpoint: "/brand/ai/product",
     request: { method: "POST", path: "/brand/ai/product" },
     input: { schema: { body: zProductBody } },
     timeouts: { requestMs: 310_000, runMs: 310_000 },

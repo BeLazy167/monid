@@ -20,7 +20,6 @@ export default defineEndpoint({
             "the organization raising funds.",
         categories: ["company-enrichment", "funding-data"],
     },
-    endpoint: "/search/fundraising",
     request: { method: "GET", path: "/search/fundraising" },
     input: {
         schema: {

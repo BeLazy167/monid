@@ -6,9 +6,9 @@ import { compileToOutput, REPO_ROOT } from "./lib.ts";
  *
  * Doc ids are PUBLIC API: an endpoint id ("saperly#place-calls") or
  * resource id ("saperly/phone-number") that drifts silently breaks every
- * caller holding the old name. Identity is now DECLARED everywhere
- * (`endpoint:` required on endpoint defs, `slug` required on resource
- * defs) — this lock is the second factor: the committed
+ * caller holding the old name. Endpoint ids may be DERIVED (`endpoint:`
+ * ?? request.path) — convenient, but a vendor route move would rename
+ * the id without any def edit. This lock is the guard: the committed
  * `connectors/ids.lock.json` records every published identity, and CI
  * fails when the compiled bundle disagrees.
  *

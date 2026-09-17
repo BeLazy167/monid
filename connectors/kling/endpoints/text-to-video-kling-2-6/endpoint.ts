@@ -30,7 +30,6 @@ export default defineEndpoint({
             "720p with native audio is rejected upstream (free).",
         ],
     },
-    endpoint: "/text-to-video/kling-2.6",
     request: { method: "POST", path: "/text-to-video/kling-2.6" },
     input: {
         schema: {

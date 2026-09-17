@@ -14,7 +14,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/options",
         categories: ["derivatives"],
     },
-    endpoint: "/market/options",
     request: { method: "GET", path: "/market/options" },
     input: {
         schema: {

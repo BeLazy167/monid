@@ -23,7 +23,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/exchange/long-short-ratio",
         categories: ["derivatives"],
     },
-    endpoint: "/exchange/long-short-ratio",
     request: { method: "GET", path: "/exchange/long-short-ratio" },
     input: {
         schema: {

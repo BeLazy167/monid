@@ -30,7 +30,6 @@ export default defineEndpoint({
         docsUrl: "https://ploid.com/documentation/api/enrichment",
         categories: ["people-enrichment"],
     },
-    endpoint: "/v1/enrich",
     request: { method: "POST", path: "/v1/enrich" },
     // `enrichments` carries the VENDOR default (["profile"], OpenAPI 2.0.0)
     // so the estimate reads one typed array (design D25).

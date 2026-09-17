@@ -36,7 +36,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/hyperliquid/leaderboard",
         categories: ["derivatives"],
     },
-    endpoint: "/hyperliquid/leaderboard",
     request: { method: "GET", path: "/hyperliquid/leaderboard" },
     input: {
         schema: {

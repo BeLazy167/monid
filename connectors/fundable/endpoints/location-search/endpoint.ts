@@ -17,7 +17,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.tryfundable.ai/api-reference/locations/search",
         categories: ["funding-data"],
     },
-    endpoint: "/location/search",
     request: { method: "GET", path: "/location/search" },
     input: { schema: { queryParams: zLocationSearchQueryParams } },
     usage: {

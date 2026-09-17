@@ -16,7 +16,6 @@ export default defineEndpoint({
         docsUrl: "https://docs.asksurf.ai/data-api/market/liquidation-chart",
         categories: ["derivatives"],
     },
-    endpoint: "/market/liquidation/chart",
     request: { method: "GET", path: "/market/liquidation/chart" },
     input: {
         schema: {
