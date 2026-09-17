@@ -109,11 +109,12 @@ That is the whole contract. No client, no adaptor, no per-provider execution
 path.
 
 Providers whose product is a durable OWNED thing (saperly's phone numbers)
-additionally declare a **resource** (`resources/<name>/resource.ts`): its
-stored-row shape, platform ops (check/release/refresh), live reads, and its
-billing schedule (prepaid rent and/or a metered variable stream). Endpoints then
-BIND to it (`resource: { id, interaction, key }`) and the engine derives the
-rest — ownership gating, provision seeds, release/refresh/reconcile marks (see
+additionally declare a **resource** (`resources/<slug>/resource.ts`): its
+stored-snapshot shape, platform lifecycle (verify/release/refresh), live views,
+and its usage rate card (fixed and/or estimated lines over one period clock).
+Endpoints then BIND to it (`resources: { uses: [{ id, key }] }` et al.,
+purpose-keyed) and the engine derives the rest — ownership gating, gated
+instances into fns, provision seeds, release/refresh/reconcile marks (see
 DEVELOPMENT.md "Resources").
 
 **Write `meta.description` like it is the product, because to an agent it is.**

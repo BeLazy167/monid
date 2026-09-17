@@ -192,11 +192,13 @@ extending the schema or engine. `openspec/specs/` is populated on archive.
 
 The async run protocol (D10/D29's reserved surface) is IMPLEMENTED — see
 `openspec/changes/add-async-run-protocol/design.md`. The RESOURCE LIFECYCLE
-(resources, endpoint bindings, accrue, stop outcomes, webhooks) is IMPLEMENTED
-too — see `openspec/changes/add-resource-lifecycle-saperly/design.md` (D30–D37;
-saperly is the proving connector: 17 endpoints + the `phone-number` resource;
-DEVELOPMENT.md "Resources" is the primer). Still reserved: declarative poll/stop
-phase arms, SUSPEND, catalog visibility.
+(resources, endpoint bindings, mid-run estimates, stop outcomes, webhooks) is
+IMPLEMENTED too — see
+`openspec/changes/add-resource-lifecycle-saperly/design.md` (D30–D37) refined by
+`openspec/changes/refine-resource-model/design.md` (D38–D47; saperly is the
+proving connector: 17 endpoints + the `phone-number` resource; DEVELOPMENT.md
+"Resources" is the primer). Still reserved: declarative poll/stop phase arms,
+SUSPEND, catalog visibility.
 
 ## Conventions
 
