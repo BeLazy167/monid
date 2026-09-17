@@ -113,14 +113,19 @@ export interface LinkedFns {
         data: LifecycleTickData,
         utils: LifecycleUtils,
     ) => Promise<LifecycleStopOutcome | undefined>;
-    /** CREATES seed (design D32): settled envelope → provision | null. */
+    /** provisions[0] seed (design D32/D43): settled envelope →
+     *  provision | null. ONE per doc (provisions ≤1, compile-checked). */
     seed?: (data: ProvisionSeedData) => ProvisionSeed | null;
-    /** Pre-run prerequisites (design D32): effectful, full lifecycle
-     *  utils; returns the seeds to persist BEFORE the run. */
-    ensure?: (
-        data: EnsureData,
-        utils: LifecycleUtils,
-    ) => Promise<ProvisionSeed[]>;
+    /** Pre-run prerequisites (design D32/D43): effectful, full lifecycle
+     *  utils; ONE wrapped fn per ensure-carrying binding, in canonical
+     *  order (uses then reads, declaration order within). The engine
+     *  runs them sequentially and concatenates the seeds. */
+    ensures?: Array<
+        (
+            data: EnsureData,
+            utils: LifecycleUtils,
+        ) => Promise<ProvisionSeed[]>
+    >;
 }
 
 /** Instantiate a verified entry in an empty scope; factories get their args applied. */
@@ -603,29 +608,42 @@ export async function linkFns(
             );
         }
     }
-    if (doc.resource?.seed) {
-        linked.seed = wrapSeed(
-            await resolveFn(
-                doc.resource.seed,
-                fns,
-                engineVersion,
-                `${doc.id}#resource.seed`,
+    if (doc.resources) {
+        const provision = (doc.resources.provisions ?? [])[0];
+        if (provision) {
+            linked.seed = wrapSeed(
+                await resolveFn(
+                    provision.seed,
+                    fns,
+                    engineVersion,
+                    `${doc.id}#resources.provisions[0].seed`,
+                ),
+                doc.id,
+                logger,
+            );
+        }
+        // canonical order: uses then reads, declaration order within
+        const ensureCarriers = [
+            ...(doc.resources.uses ?? []).map((binding, index) =>
+                [binding, `uses[${index}]`] as const
             ),
-            doc.id,
-            logger,
-        );
-    }
-    if (doc.resource?.ensure) {
-        linked.ensure = wrapEnsure(
-            await resolveFn(
-                doc.resource.ensure,
-                fns,
-                engineVersion,
-                `${doc.id}#resource.ensure`,
+            ...(doc.resources.reads ?? []).map((binding, index) =>
+                [binding, `reads[${index}]`] as const
             ),
-            doc.id,
-            logger,
-        );
+        ];
+        for (const [binding, label] of ensureCarriers) {
+            if (!binding.ensure) continue;
+            (linked.ensures ??= []).push(wrapEnsure(
+                await resolveFn(
+                    binding.ensure,
+                    fns,
+                    engineVersion,
+                    `${doc.id}#resources.${label}.ensure`,
+                ),
+                doc.id,
+                logger,
+            ));
+        }
     }
     return linked;
 }

@@ -41,10 +41,11 @@ export default defineEndpoint({
             },
         }),
     },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "READS",
-        key: "$.body.numberId",
+    resources: {
+        reads: [{
+            id: "saperly/phone-number",
+            key: "$.body.numberId",
+        }],
     },
     usage: { model: { kind: UsageModelKind.FREE } },
     lifecycle: {

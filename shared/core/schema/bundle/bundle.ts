@@ -86,11 +86,23 @@ export const zBundle = z.strictObject({
     }
     // every endpoint binding resolves to a bundled resource doc
     for (const [id, doc] of Object.entries(bundle.endpoints)) {
-        if (doc.resource && !(bundle.resources ?? {})[doc.resource.id]) {
+        const boundIds = doc.resources
+            ? [
+                ...doc.resources.provisions ?? [],
+                ...doc.resources.uses ?? [],
+                ...doc.resources.updates ?? [],
+                ...doc.resources.releases ?? [],
+                ...doc.resources.reads ?? [],
+            ].map((binding) => binding.id)
+            : [];
+        const unknown = boundIds.find(
+            (bound) => !(bundle.resources ?? {})[bound],
+        );
+        if (unknown !== undefined) {
             ctx.addIssue({
                 code: "custom",
                 message:
-                    `endpoints["${id}"] binds unknown resource: ${doc.resource.id}`,
+                    `endpoints["${id}"] binds unknown resource: ${unknown}`,
             });
         }
     }

@@ -69,59 +69,60 @@ export default defineEndpoint({
     endpoint: "/provision-numbers",
     request: { method: "POST", path: "/numbers" },
     input: { schema: { body: zProvisionNumberBody } },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "CREATES",
-        /**
-         * PURE, post-success, on the RAW settle body — FORGIVING by v1
-         * contract (the manageability minimum is the upstream id ALONE;
-         * a missing phoneNumber degrades). A 2xx with NO readable id is
-         * never "nothing provisioned" for a purchase — the THROW maps to
-         * PROVISION_CONSTRUCT (host alarms; run stays uncharged
-         * host-side).
-         */
-        seed: ({ data, utils }) => {
-            const $ = utils.json;
-            const out = data.output;
-            const id = $.optionalStr(out, "$.id");
-            if (id === undefined) {
-                throw new Error(
-                    "saperly returned success but no readable number id",
-                );
-            }
-            const numberType = $.optionalStr(out, "$.numberType");
-            const connection = $.optionalStr(out, "$.connection.id");
-            const monthly = $.optionalNum(out, "$.monthlyPriceCents");
-            const phoneNumber = $.optionalStr(out, "$.phoneNumber");
-            return {
-                resource: "saperly/phone-number",
-                externalId: id,
-                identifier: phoneNumber ?? id,
-                data: {
-                    country: $.optionalStr(out, "$.country") ??
-                        $.optionalStr(data.input.body ?? {}, "$.country") ??
-                        "US",
-                    numberType: numberType === "toll_free"
-                        ? "toll_free"
-                        : "local",
-                    ...(phoneNumber !== undefined ? { phoneNumber } : {}),
-                    ...(connection !== undefined
-                        ? { externalRefs: { connection } }
-                        : {}),
-                },
-                // the QUOTED monthly — the host's sticky max-rule seed
-                ...(monthly !== undefined
-                    ? {
-                        observedUsage: {
-                            rent: {
-                                credit: "default",
-                                amount: monthly / 100,
+    resources: {
+        provisions: [{
+            id: "saperly/phone-number",
+            /**
+             * PURE, post-success, on the RAW settle body — FORGIVING by v1
+             * contract (the manageability minimum is the upstream id ALONE;
+             * a missing phoneNumber degrades). A 2xx with NO readable id is
+             * never "nothing provisioned" for a purchase — the THROW maps to
+             * PROVISION_CONSTRUCT (host alarms; run stays uncharged
+             * host-side).
+             */
+            seed: ({ data, utils }) => {
+                const $ = utils.json;
+                const out = data.output;
+                const id = $.optionalStr(out, "$.id");
+                if (id === undefined) {
+                    throw new Error(
+                        "saperly returned success but no readable number id",
+                    );
+                }
+                const numberType = $.optionalStr(out, "$.numberType");
+                const connection = $.optionalStr(out, "$.connection.id");
+                const monthly = $.optionalNum(out, "$.monthlyPriceCents");
+                const phoneNumber = $.optionalStr(out, "$.phoneNumber");
+                return {
+                    resource: "saperly/phone-number",
+                    externalId: id,
+                    identifier: phoneNumber ?? id,
+                    data: {
+                        country: $.optionalStr(out, "$.country") ??
+                            $.optionalStr(data.input.body ?? {}, "$.country") ??
+                            "US",
+                        numberType: numberType === "toll_free"
+                            ? "toll_free"
+                            : "local",
+                        ...(phoneNumber !== undefined ? { phoneNumber } : {}),
+                        ...(connection !== undefined
+                            ? { externalRefs: { connection } }
+                            : {}),
+                    },
+                    // the QUOTED monthly — the host's sticky max-rule seed
+                    ...(monthly !== undefined
+                        ? {
+                            observedUsage: {
+                                rent: {
+                                    credit: "default",
+                                    amount: monthly / 100,
+                                },
                             },
-                        },
-                    }
-                    : {}),
-            };
-        },
+                        }
+                        : {}),
+                };
+            },
+        }],
     },
     usage: {
         model: {

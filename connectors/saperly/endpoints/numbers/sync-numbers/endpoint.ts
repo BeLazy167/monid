@@ -47,10 +47,11 @@ export default defineEndpoint({
             },
         }),
     },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "UPDATES",
-        key: "$.body.numberId",
+    resources: {
+        updates: [{
+            id: "saperly/phone-number",
+            key: "$.body.numberId",
+        }],
     },
     usage: { model: { kind: UsageModelKind.FREE } },
 });

@@ -42,10 +42,11 @@ export default defineEndpoint({
     endpoint: "/send-messages",
     request: { method: "POST", path: "/messages" },
     input: { schema: { body: zSendMessageBody } },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "USES",
-        key: "$.body.fromNumberId",
+    resources: {
+        uses: [{
+            id: "saperly/phone-number",
+            key: "$.body.fromNumberId",
+        }],
     },
     usage: {
         model: {

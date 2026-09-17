@@ -52,10 +52,11 @@ export default defineEndpoint({
             },
         }),
     },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "RELEASES",
-        key: "$.body.numberId",
+    resources: {
+        releases: [{
+            id: "saperly/phone-number",
+            key: "$.body.numberId",
+        }],
     },
     usage: { model: { kind: UsageModelKind.FREE } },
     lifecycle: {

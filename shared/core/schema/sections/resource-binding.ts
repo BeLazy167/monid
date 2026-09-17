@@ -3,30 +3,37 @@ import { zResourceId } from "../resource/ids.ts";
 import { zEnsureFn, zProvisionSeedFn } from "../hooks/resource-binding.ts";
 
 /**
- * ENDPOINT↔RESOURCE BINDING (design D32) — ONE optional `resource:` block
- * on the endpoint def, replacing v1's per-def verb soup
- * (createsResources / usesResource / releasesResource / refreshesResource
- * / consumesOwnResources / ensureResources) with one derived judgment:
- * the INTERACTION names the relationship; everything the host needs
- * (ownership pre-gate, provision persistence, release/refresh/reconcile
- * marks, reader capability) derives from it. ENDPOINT-ONLY — a provider
- * cannot default a binding (which endpoints touch resources is the least
+ * ENDPOINT↔RESOURCE BINDINGS (design D32, reshaped by
+ * refine-resource-model D43) — ONE optional `resources:` block on the
+ * endpoint def, PURPOSE-KEYED: the key names the relationship (v1's
+ * interaction vocabulary, pluralized), the value is ALWAYS an array —
+ * an endpoint may touch several owned resources in one run (transfer a
+ * call FROM one number TO another). ENDPOINT-ONLY — a provider cannot
+ * default a binding (which endpoints touch resources is the least
  * provider-uniform fact there is).
+ *
+ *   - `provisions` (≤1, compile-checked): a success PROVISIONS — `seed`
+ *     maps the settled envelope to the persisted record. ONE per
+ *     endpoint: a run that could provision two things is two endpoints.
+ *   - `uses`:     the run consumes an owned resource (places a call FROM
+ *     your number): ownership-gated via `key`; marks the resource for
+ *     usage reconcile at settle.
+ *   - `updates`:  mutates upstream resource state (connect/disconnect):
+ *     ownership-gated; marks it for refresh at settle.
+ *   - `releases`: tears down: ownership-gated; a success marks the
+ *     instance released (billing stops host-side).
+ *   - `reads`:    read-only against an owned resource: ownership-gated,
+ *     no settle marks.
+ *
+ * GATE ORDER is canonical: uses → updates → releases → reads,
+ * declaration order within each purpose. Every KEYED binding's gated
+ * instance rides into the lifecycle fns as `data.resources[alias]`
+ * (`as` names the alias; default = the key path's last segment) — pure
+ * hooks stay input-only.
  */
 
-/**
- *   - CREATES:  a success PROVISIONS — `seed` (required here) maps the
- *     settled envelope to the persisted record(s).
- *   - USES:     the run consumes an owned resource (places a call FROM
- *     your number): ownership-gated via `key`; marks the resource for
- *     variable-cost reconcile at settle.
- *   - UPDATES:  mutates upstream resource state (connect/disconnect):
- *     ownership-gated; marks it for refresh at settle.
- *   - RELEASES: tears down: ownership-gated; a success marks the row
- *     released (billing stops host-side).
- *   - READS:    read-only against an owned resource: ownership-gated,
- *     no settle marks.
- */
+/** The interaction vocabulary as DATA — the cross-doc words (settle
+ *  marks, webhook routing verdicts) name relationships with these. */
 export const ResourceInteraction = {
     CREATES: "CREATES",
     USES: "USES",
@@ -39,72 +46,123 @@ export type ResourceInteraction =
 
 export const zResourceInteraction = z.enum(ResourceInteraction);
 
-export const zResourceBindingSection = z.strictObject({
+/** The purpose keys of the `resources:` block, in canonical gate order
+ *  (provisions never gates — nothing exists yet to gate on). */
+export const RESOURCE_GATE_ORDER = [
+    "uses",
+    "updates",
+    "releases",
+    "reads",
+] as const;
+export type ResourcePurpose = (typeof RESOURCE_GATE_ORDER)[number];
+
+/** provisions[]: nothing exists yet — no key, no alias, no ensure (the
+ *  run itself IS the provisioner; a prerequisite that provisions belongs
+ *  on the endpoints that USE the resource). */
+export const zProvisionBinding = z.strictObject({
     /** The bound resource doc — "<provider>/<name>"; same-provider
      *  (compile-checked against the connector's own resources). */
     id: zResourceId,
-    interaction: zResourceInteraction,
+    seed: zProvisionSeedFn,
+});
+export type ProvisionBinding = z.infer<typeof zProvisionBinding>;
+
+/** uses[] / reads[]: `key` OPTIONAL — an ANCHOR endpoint derives
+ *  ownership in-fn via `utils.resources` (saperly's call artifacts); a
+ *  pure reader serves from the reader alone (list-numbers). `ensure`
+ *  makes prerequisites TRUE pre-run (v1 ensureResources). */
+export const zGatedBinding = z.strictObject({
+    id: zResourceId,
     /** JSONPath into the VALIDATED input naming the externalId the run
-     *  targets (e.g. `$.body.from`) — REQUIRED for UPDATES/RELEASES
-     *  (their settle marks need a target), OPTIONAL for USES/READS (an
-     *  ANCHOR endpoint derives ownership in-fn via `utils.resources` —
-     *  saperly's call artifacts; a pure reader serves from the reader
-     *  alone — list-numbers), FORBIDDEN for CREATES (nothing exists yet
-     *  to target). When present the engine resolves it and pre-gates:
-     *  not owned ⇒ the uniform vendor-shaped 404 AS DATA, zero usage,
-     *  upstream never touched. */
+     *  targets (e.g. `$.body.from`). When present the engine resolves it
+     *  and pre-gates: not owned ⇒ the uniform vendor-shaped 404 AS DATA,
+     *  zero usage, upstream never touched — and the gated instance rides
+     *  into the lifecycle fns as `data.resources[alias]`. */
     key: z.string().min(1).optional(),
-    /** CREATES-only (required there, forbidden elsewhere). */
-    seed: zProvisionSeedFn.optional(),
-    /** Gated interactions only: pre-run prerequisites (v1
-     *  ensureResources). FORBIDDEN on CREATES — the run itself IS the
-     *  provisioner there; a prerequisite that provisions belongs on the
-     *  endpoints that USE the resource. */
+    /** The instance's alias under `data.resources` — defaults to the key
+     *  path's last segment; unique across ALL purposes. Keyed bindings
+     *  only. */
+    as: z.string().min(1).optional(),
     ensure: zEnsureFn.optional(),
-}).superRefine((binding, ctx) => {
-    if (binding.interaction === ResourceInteraction.CREATES) {
-        if (binding.seed === undefined) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["seed"],
-                message: "CREATES binding requires seed",
-            });
-        }
-        if (binding.key !== undefined) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["key"],
-                message: "CREATES binding cannot take key (nothing to target)",
-            });
-        }
-        if (binding.ensure !== undefined) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["ensure"],
-                message:
-                    "ensure is forbidden on CREATES — the run itself provisions",
-            });
-        }
-    } else {
-        if (
-            binding.key === undefined &&
-            (binding.interaction === ResourceInteraction.UPDATES ||
-                binding.interaction === ResourceInteraction.RELEASES)
-        ) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["key"],
-                message:
-                    `${binding.interaction} binding requires key (its settle mark needs a target)`,
-            });
-        }
-        if (binding.seed !== undefined) {
-            ctx.addIssue({
-                code: "custom",
-                path: ["seed"],
-                message: "seed is CREATES-only",
-            });
-        }
+});
+export type GatedBinding = z.infer<typeof zGatedBinding>;
+
+/** updates[] / releases[]: `key` REQUIRED — their settle marks need a
+ *  target. No ensure (mutating an instance you had to provision first is
+ *  a uses-side prerequisite). */
+export const zTargetedBinding = z.strictObject({
+    id: zResourceId,
+    key: z.string().min(1),
+    as: z.string().min(1).optional(),
+});
+export type TargetedBinding = z.infer<typeof zTargetedBinding>;
+
+/** The alias a KEYED binding's gated instance rides under — `as`, or the
+ *  key path's last segment (`$.body.fromNumberId` → "fromNumberId"). */
+export function bindingAlias(
+    binding: { key?: string; as?: string },
+): string | undefined {
+    if (binding.as !== undefined) return binding.as;
+    if (binding.key === undefined) return undefined;
+    const segments = binding.key.split(".");
+    return segments[segments.length - 1];
+}
+
+export const zResourcesSection = z.strictObject({
+    provisions: z.array(zProvisionBinding).max(
+        1,
+        "an endpoint provisions at most ONE resource — a run that could " +
+            "provision two things is two endpoints",
+    ).optional(),
+    uses: z.array(zGatedBinding).optional(),
+    updates: z.array(zTargetedBinding).optional(),
+    releases: z.array(zTargetedBinding).optional(),
+    reads: z.array(zGatedBinding).optional(),
+}).superRefine((section, ctx) => {
+    const purposes = [
+        section.provisions,
+        section.uses,
+        section.updates,
+        section.releases,
+        section.reads,
+    ];
+    if (purposes.every((list) => (list?.length ?? 0) === 0)) {
+        ctx.addIssue({
+            code: "custom",
+            message: "resources: block declares no bindings — drop it",
+        });
+    }
+    // `as` without `key` is unanchored — there is no instance to alias
+    for (const purpose of ["uses", "reads"] as const) {
+        (section[purpose] ?? []).forEach((binding, index) => {
+            if (binding.as !== undefined && binding.key === undefined) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: [purpose, index, "as"],
+                    message: "`as` without `key` aliases nothing — a " +
+                        "keyless binding gates no instance",
+                });
+            }
+        });
+    }
+    // alias uniqueness ACROSS purposes — data.resources is one flat map
+    const seen = new Map<string, string>();
+    for (const purpose of RESOURCE_GATE_ORDER) {
+        (section[purpose] ?? []).forEach((binding, index) => {
+            const alias = bindingAlias(binding);
+            if (alias === undefined) return;
+            const prior = seen.get(alias);
+            if (prior !== undefined) {
+                ctx.addIssue({
+                    code: "custom",
+                    path: [purpose, index],
+                    message: `alias "${alias}" collides with ${prior} — ` +
+                        `disambiguate with \`as\``,
+                });
+                return;
+            }
+            seen.set(alias, `${purpose}[${index}]`);
+        });
     }
 });
-export type ResourceBindingSection = z.infer<typeof zResourceBindingSection>;
+export type ResourcesSection = z.infer<typeof zResourcesSection>;

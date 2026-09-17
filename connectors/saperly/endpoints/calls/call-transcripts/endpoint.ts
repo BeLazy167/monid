@@ -44,7 +44,7 @@ export default defineEndpoint({
             },
         }),
     },
-    resource: { id: "saperly/phone-number", interaction: "USES" },
+    resources: { uses: [{ id: "saperly/phone-number" }] },
     usage: { model: { kind: UsageModelKind.FREE } },
     lifecycle: {
         start: async ({ data, utils }) => {

@@ -1,6 +1,7 @@
 import { greaterThan, parse as parseSemver } from "@std/semver";
 import {
     assembleUsage,
+    bindingAlias,
     contractConfig,
     countsMismatch,
     creditsDisagree,
@@ -9,6 +10,7 @@ import {
     type FnState,
     type FnUsage,
     formatZodError,
+    type GatedResources,
     getPath,
     type HookLogger,
     type Json,
@@ -20,9 +22,10 @@ import {
     pruneZeroCredits,
     type RefreshOutcome,
     type ReleaseOutcome,
+    RESOURCE_GATE_ORDER,
     type ResourceDoc,
     type ResourceEffects,
-    ResourceInteraction,
+    type ResourcePurpose,
     type ResourceTarget,
     type RunCompleted,
     type RunInput,
@@ -122,10 +125,10 @@ export class Engine implements ConnectorEngine {
         }
         // D32 fail-closed: a bound endpoint without its ownership window
         // must not run — caught HERE (host wiring), never mid-run.
-        if (doc.resource && !this.ctx.resources) {
+        if (doc.resources && !this.ctx.resources) {
             throw new EngineError(
                 EngineErrorCode.NO_RESOURCE_READER,
-                `${doc.id} binds resource ${doc.resource.id} but EngineCtx ` +
+                `${doc.id} declares resource bindings but EngineCtx ` +
                     `carries no ResourceReader`,
             );
         }
@@ -181,6 +184,15 @@ export class Engine implements ConnectorEngine {
     }
 }
 
+/** One keyed binding's resolved gate work: WHICH purpose declared it
+ *  (the settle-mark bucket), the vendor target, and the alias its gated
+ *  instance rides under in `data.resources`. */
+interface GatedTarget {
+    purpose: ResourcePurpose;
+    alias: string;
+    target: ResourceTarget;
+}
+
 export class LoadedEndpoint implements RunnableEndpoint {
     constructor(
         readonly doc: EndpointDoc,
@@ -206,65 +218,103 @@ export class LoadedEndpoint implements RunnableEndpoint {
             requestInfo,
             input,
             sleep: (ms) => (this.ctx.sleep ?? sleep)(ms),
-            resources: this.doc.resource && this.ctx.resources
+            resources: this.doc.resources && this.ctx.resources
                 ? makeResourcesWindow(this.doc.id, this.ctx.resources)
                 : undeclaredResources(this.doc.id),
         });
     }
 
-    /** The binding's ownership TARGET for this call — the JSONPath `key`
-     *  resolved against the VALIDATED (pre-toRequest) input. Undefined
-     *  for unbound docs and CREATES (nothing exists yet to target); an
+    /** The KEYED bindings' ownership TARGETS for this call — every
+     *  purpose's JSONPath `key` resolved against the VALIDATED
+     *  (pre-toRequest) input, in canonical gate order (uses → updates →
+     *  releases → reads, declaration order within). Keyless bindings
+     *  resolve nothing (anchor endpoints derive ownership in-fn); an
      *  unresolvable/non-string key is the CALLER's fault (the input
      *  simply does not name a resource) → INVALID_INPUT. */
-    private resolveTarget(runInput: RunInput): ResourceTarget | undefined {
-        const binding = this.doc.resource;
-        if (!binding || binding.key === undefined) return undefined;
+    private resolveTargets(runInput: RunInput): GatedTarget[] {
+        const section = this.doc.resources;
+        if (!section) return [];
         const input = validateInput(this.doc, runInput);
-        const value = getPath(input as unknown as Json, binding.key);
-        if (typeof value !== "string" || value.length === 0) {
-            throw new EngineError(
-                EngineErrorCode.INVALID_INPUT,
-                `${this.doc.id}: resource key ${binding.key} did not resolve ` +
-                    `to a non-empty string in the validated input`,
-            );
+        const targets: GatedTarget[] = [];
+        for (const purpose of RESOURCE_GATE_ORDER) {
+            const declared: Array<{ id: string; key?: string; as?: string }> =
+                section[purpose] ?? [];
+            for (const binding of declared) {
+                if (binding.key === undefined) continue;
+                const value = getPath(input as unknown as Json, binding.key);
+                if (typeof value !== "string" || value.length === 0) {
+                    throw new EngineError(
+                        EngineErrorCode.INVALID_INPUT,
+                        `${this.doc.id}: resources.${purpose} key ` +
+                            `${binding.key} did not resolve to a non-empty ` +
+                            `string in the validated input`,
+                    );
+                }
+                targets.push({
+                    purpose,
+                    // the alias exists by construction: keyed ⇒ aliased
+                    alias: bindingAlias(binding) as string,
+                    target: { resource: binding.id, externalId: value },
+                });
+            }
         }
-        return { resource: binding.id, externalId: value };
+        return targets;
     }
 
-    /** The D32 ownership PRE-GATE: not owned ⇒ the uniform vendor-shaped
+    /** The D32 ownership PRE-GATE over ALL keyed bindings, plus the D43
+     *  instance gather: every gated row rides into the lifecycle fns as
+     *  `data.resources[alias]`. Not owned ⇒ the uniform vendor-shaped
      *  404 AS DATA — zero usage, upstream never touched, shaped exactly
-     *  like a provider miss so callers need no new branch. */
-    private async gateOwnership(
-        target: ResourceTarget,
-    ): Promise<RunCompleted | undefined> {
+     *  like a provider miss so callers need no new branch. `lenient`
+     *  (stop's posture — teardown proceeds) skips missing rows instead
+     *  of missing the run. */
+    private async gatherGated(
+        runInput: RunInput,
+        lenient = false,
+    ): Promise<
+        | { miss: RunCompleted }
+        | { targets: GatedTarget[]; instances?: GatedResources }
+    > {
+        const targets = this.resolveTargets(runInput);
+        if (targets.length === 0) return { targets };
         // reader presence is a load() invariant for bound docs
         const reader = this.ctx.resources as ResourceReader;
-        const rows = await makeResourcesWindow(this.doc.id, reader).owned({
-            resource: target.resource,
-            externalId: target.externalId,
-        });
-        if (rows.length > 0) return undefined;
-        const at = this.now().toISOString();
-        return {
-            kind: RunKind.COMPLETED,
-            httpStatus: 404,
-            output: {
-                error: "not_found",
-                message:
-                    `resource ${target.resource} "${target.externalId}" is not owned by this workspace`,
-            },
-            usage: zeroUsage(),
-            isProviderError: true,
-            timing: {
-                startedAt: at,
-                completedAt: at,
-                attempts: 0,
-                startRequestMs: 0,
-                pollMsTotal: 0,
-                providerTotalMs: 0,
-            },
-        };
+        const window = makeResourcesWindow(this.doc.id, reader);
+        const instances: GatedResources = {};
+        for (const { target, alias } of targets) {
+            const rows = await window.owned({
+                resource: target.resource,
+                externalId: target.externalId,
+            });
+            if (rows.length === 0) {
+                if (lenient) continue;
+                const at = this.now().toISOString();
+                return {
+                    miss: {
+                        kind: RunKind.COMPLETED,
+                        httpStatus: 404,
+                        output: {
+                            error: "not_found",
+                            message: `resource ${target.resource} ` +
+                                `"${target.externalId}" is not owned by ` +
+                                `this workspace`,
+                        },
+                        usage: zeroUsage(),
+                        isProviderError: true,
+                        timing: {
+                            startedAt: at,
+                            completedAt: at,
+                            attempts: 0,
+                            startRequestMs: 0,
+                            pollMsTotal: 0,
+                            providerTotalMs: 0,
+                        },
+                    },
+                };
+            }
+            instances[alias] = rows[0];
+        }
+        return { targets, instances };
     }
 
     // ---- Temporal-activity-shaped: stateless, strict-JSON in/out, no sleeps ----
@@ -302,13 +352,21 @@ export class LoadedEndpoint implements RunnableEndpoint {
      *  persist the returned seeds BEFORE start() executes (v1 ordering:
      *  a mid-run crash never orphans an upstream resource). */
     async ensure(runInput: RunInput): Promise<ProvisionSeed[]> {
-        if (!this.fns.ensure) return [];
+        if (!this.fns.ensures || this.fns.ensures.length === 0) return [];
         const input = validateInput(this.doc, runInput);
         const request = this.requestInfo(this.deriveInput(runInput));
-        return await this.fns.ensure(
-            { input, scope: { key: this.ctx.scopeKey ?? "local" } },
-            this.utilsFor(input, request),
-        );
+        const seeds: ProvisionSeed[] = [];
+        // sequential, canonical order (uses then reads) — a later ensure
+        // may depend on an earlier one's provision
+        for (const ensure of this.fns.ensures) {
+            seeds.push(
+                ...await ensure(
+                    { input, scope: { key: this.ctx.scopeKey ?? "local" } },
+                    this.utilsFor(input, request),
+                ),
+            );
+        }
+        return seeds;
     }
 
     async start(
@@ -319,22 +377,34 @@ export class LoadedEndpoint implements RunnableEndpoint {
         const input = this.deriveInput(runInput);
         const t0 = this.now();
 
-        // D32 ownership pre-gate — before ANY upstream effect, both modes.
-        const target = this.resolveTarget(runInput);
-        if (target) {
-            const miss = await this.gateOwnership(target);
-            if (miss) return miss;
-        }
+        // D32 ownership pre-gate — before ANY upstream effect, both modes;
+        // the gated instances (D43) ride into the lifecycle fns.
+        const gated = await this.gatherGated(runInput);
+        if ("miss" in gated) return gated.miss;
 
         // LIFECYCLE mode: the start fn replaces the declarative execution —
         // the compiled request rides in as DATA (ctx.data.request).
         if (this.fns.lifecycleStart) {
             const request = this.requestInfo(input);
             const outcome = await this.fns.lifecycleStart(
-                { input, request, run: this.runInfo(run) },
+                {
+                    input,
+                    request,
+                    run: this.runInfo(run),
+                    ...(gated.instances !== undefined &&
+                            Object.keys(gated.instances).length > 0
+                        ? { resources: gated.instances }
+                        : {}),
+                },
                 this.utilsFor(input, request),
             );
-            return this.fromOutcome(outcome, input, undefined, t0, target);
+            return this.fromOutcome(
+                outcome,
+                input,
+                undefined,
+                t0,
+                gated.targets,
+            );
         }
 
         // DECLARATIVE mode (sync): one request, engine-executed.
@@ -350,7 +420,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
             sniffDecode(response),
             undefined,
             undefined,
-            target,
+            gated.targets,
             {
                 startedAt: t0.toISOString(),
                 completedAt: completedAt.toISOString(),
@@ -391,11 +461,20 @@ export class LoadedEndpoint implements RunnableEndpoint {
         const input = this.deriveInput(runInput);
         const request = this.requestInfo(input);
         const t0 = this.now();
+        // re-gate per tick (each tick is a separate stateless activity);
+        // the fresh instances ride in — a host-side refresh mid-run is
+        // VISIBLE to the fn, by design
+        const gated = await this.gatherGated(runInput);
+        if ("miss" in gated) return gated.miss;
         const outcome = await this.fns.lifecyclePoll(
             {
                 input,
                 request,
                 run: this.runInfo(run),
+                ...(gated.instances !== undefined &&
+                        Object.keys(gated.instances).length > 0
+                    ? { resources: gated.instances }
+                    : {}),
                 lifecycle: { state: prevState },
             },
             this.utilsFor(input, request),
@@ -405,7 +484,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
             input,
             prevState,
             t0,
-            this.resolveTarget(runInput),
+            gated.targets,
         );
     }
 
@@ -433,11 +512,20 @@ export class LoadedEndpoint implements RunnableEndpoint {
         try {
             const input = this.deriveInput(runInput);
             const request = this.requestInfo(input);
+            // LENIENT gather — teardown proceeds even when a row is gone
+            // mid-run (missing instances are simply absent from the map)
+            const gated = await this.gatherGated(runInput, true);
+            const instances = "miss" in gated ? undefined : gated.instances;
+            const targets = "miss" in gated ? [] : gated.targets;
             const outcome = await this.fns.lifecycleStop(
                 {
                     input,
                     request,
                     run: this.runInfo(run),
+                    ...(instances !== undefined &&
+                            Object.keys(instances).length > 0
+                        ? { resources: instances }
+                        : {}),
                     lifecycle: { state: prevState },
                 },
                 this.utilsFor(input, request),
@@ -451,7 +539,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
                     input,
                     prevState,
                     t0,
-                    this.resolveTarget(runInput),
+                    targets,
                 ) as RunCompleted;
             }
             // UNRESOLVED — merge the last known state for the host
@@ -660,7 +748,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
         input: RunInput,
         prevState: RunState | undefined,
         t0: Date,
-        target?: ResourceTarget,
+        targets: GatedTarget[] = [],
     ): RunStartResult {
         const completedAt = this.now();
         const tickMs = Math.max(0, completedAt.getTime() - t0.getTime());
@@ -703,7 +791,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
             outcome.output,
             finalState,
             outcome.providerHttpStatus,
-            target,
+            targets,
             {
                 startedAt: timing.startedAt,
                 completedAt: completedAt.toISOString(),
@@ -733,7 +821,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
         raw: Json,
         state: RunState | undefined,
         providerHttpStatus: number | undefined,
-        target: ResourceTarget | undefined,
+        targets: GatedTarget[],
         timing: RunTiming,
     ): RunCompleted {
         const doc = this.doc;
@@ -840,7 +928,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
         // prices).
         const resources = isProviderError
             ? undefined
-            : this.deriveEffects(input, raw, state, target);
+            : this.deriveEffects(input, raw, state, targets);
         // flat, kind-discriminated (no nested result to unwrap)
         return {
             kind: RunKind.COMPLETED,
@@ -857,50 +945,51 @@ export class LoadedEndpoint implements RunnableEndpoint {
         };
     }
 
-    /** The binding's settle-side derivation (design D32): CREATES runs
-     *  the seed fn on the RAW envelope; the gated interactions mark
-     *  their resolved target. READS marks nothing. */
+    /** The bindings' settle-side derivation (design D32/D43): the
+     *  provisions binding runs its seed fn on the RAW envelope; every
+     *  keyed uses/updates/releases target lands in its purpose's mark
+     *  bucket. reads marks nothing. */
     private deriveEffects(
         input: RunInput,
         output: Json,
         state: RunState | undefined,
-        target: ResourceTarget | undefined,
+        targets: GatedTarget[],
     ): ResourceEffects | undefined {
-        const binding = this.doc.resource;
-        if (!binding) return undefined;
-        switch (binding.interaction) {
-            case ResourceInteraction.CREATES: {
-                if (!this.fns.seed) return undefined; // compile-guaranteed
-                const seed = this.fns.seed({
-                    input,
-                    output,
-                    ...(state !== undefined
-                        ? {
-                            state: {
-                                ...(state.externalRunId !== undefined
-                                    ? { externalRunId: state.externalRunId }
-                                    : {}),
-                                ...(state.stage !== undefined
-                                    ? { stage: state.stage }
-                                    : {}),
-                                ...(state.data !== undefined
-                                    ? { data: state.data }
-                                    : {}),
-                            },
-                        }
-                        : {}),
-                });
-                return seed === null ? undefined : { provisions: [seed] };
-            }
-            case ResourceInteraction.USES:
-                return target ? { reconciles: [target] } : undefined;
-            case ResourceInteraction.UPDATES:
-                return target ? { refreshes: [target] } : undefined;
-            case ResourceInteraction.RELEASES:
-                return target ? { releases: [target] } : undefined;
-            case ResourceInteraction.READS:
-                return undefined;
+        if (!this.doc.resources) return undefined;
+        const effects: ResourceEffects = {};
+        if (this.fns.seed) {
+            const seed = this.fns.seed({
+                input,
+                output,
+                ...(state !== undefined
+                    ? {
+                        state: {
+                            ...(state.externalRunId !== undefined
+                                ? { externalRunId: state.externalRunId }
+                                : {}),
+                            ...(state.stage !== undefined
+                                ? { stage: state.stage }
+                                : {}),
+                            ...(state.data !== undefined
+                                ? { data: state.data }
+                                : {}),
+                        },
+                    }
+                    : {}),
+            });
+            if (seed !== null) effects.provisions = [seed];
         }
+        const bucketOf = {
+            uses: "reconciles",
+            updates: "refreshes",
+            releases: "releases",
+        } as const;
+        for (const { purpose, target } of targets) {
+            if (purpose === "reads") continue;
+            const bucket = bucketOf[purpose as keyof typeof bucketOf];
+            (effects[bucket] ??= []).push(target);
+        }
+        return Object.keys(effects).length > 0 ? effects : undefined;
     }
 
     /** Counts ↔ model discipline (design D19), fail-closed (FN_CONTRACT —

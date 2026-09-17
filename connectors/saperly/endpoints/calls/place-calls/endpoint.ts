@@ -67,10 +67,11 @@ export default defineEndpoint({
         // safety net — a call should never legitimately run this long
         runMs: 4 * 60 * 60 * 1000,
     },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "USES",
-        key: "$.body.fromNumberId",
+    resources: {
+        uses: [{
+            id: "saperly/phone-number",
+            key: "$.body.fromNumberId",
+        }],
     },
     usage: {
         /** $0.28 per 60 seconds keeps the per-minute carrier-derived rate

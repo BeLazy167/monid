@@ -33,10 +33,11 @@ export default defineEndpoint({
     endpoint: "/list-calls",
     request: { method: "GET", path: "/calls" },
     input: { schema: { queryParams: zListCallsQuery } },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "USES",
-        key: "$.queryParams.numberId",
+    resources: {
+        uses: [{
+            id: "saperly/phone-number",
+            key: "$.queryParams.numberId",
+        }],
     },
     usage: { model: { kind: UsageModelKind.FREE } },
     lifecycle: {

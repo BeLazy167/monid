@@ -21,7 +21,7 @@ export default defineEndpoint({
     endpoint: "/list-numbers",
     request: { method: "GET", path: "/numbers" },
     /** READS with NO key: the reader IS the read — nothing to gate. */
-    resource: { id: "saperly/phone-number", interaction: "READS" },
+    resources: { reads: [{ id: "saperly/phone-number" }] },
     usage: { model: { kind: UsageModelKind.FREE } },
     lifecycle: {
         start: async ({ utils }) => {

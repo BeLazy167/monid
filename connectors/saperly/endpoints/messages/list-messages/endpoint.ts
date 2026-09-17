@@ -32,10 +32,11 @@ export default defineEndpoint({
     endpoint: "/list-messages",
     request: { method: "GET", path: "/messages" },
     input: { schema: { queryParams: zListMessagesQuery } },
-    resource: {
-        id: "saperly/phone-number",
-        interaction: "USES",
-        key: "$.queryParams.numberId",
+    resources: {
+        uses: [{
+            id: "saperly/phone-number",
+            key: "$.queryParams.numberId",
+        }],
     },
     usage: { model: { kind: UsageModelKind.FREE } },
 });

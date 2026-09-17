@@ -17,9 +17,9 @@ import {
     type ProviderDef,
     type ProviderDoc,
     pruneUndefined,
+    RESOURCE_GATE_ORDER,
     type ResourceDef,
     type ResourceDoc,
-    ResourceInteraction,
     stableStringify,
     ValidationError,
     zBundle,
@@ -743,18 +743,27 @@ export async function compileBundle(
                 }
             }
 
-            // ---- resource binding (design D32) ----------------------------
-            const binding = def.resource;
-            let seedRef: FnRef | undefined;
-            let ensureRef: FnRef | undefined;
-            if (binding) {
+            // ---- resource bindings (design D32/D43) -----------------------
+            const bindingsSection = def.resources;
+            const bindingRefs: FnRef[] = [];
+            // shared per-binding lints; returns the interned {seed,ensure}
+            const compileBinding = async (
+                binding: {
+                    id: string;
+                    key?: string;
+                    seed?: unknown;
+                    ensure?: unknown;
+                },
+                label: string,
+                slotName: "create" | "update" | "release" | undefined,
+            ): Promise<{ seed?: FnRef; ensure?: FnRef }> => {
                 // same-provider by construction: the binding is the
                 // endpoint's contract with ITS OWN provider's resource
                 if (!binding.id.startsWith(`${providerName}/`)) {
                     throw new CompileError(
                         CompileErrorCode.DOC_MALFORMED,
-                        `${where}: resource binding ${binding.id} names a ` +
-                            `foreign provider — bindings are same-provider ` +
+                        `${where}: ${label} binds ${binding.id} — a ` +
+                            `foreign provider; bindings are same-provider ` +
                             `(cross-provider reuse goes through ensure)`,
                     );
                 }
@@ -762,9 +771,9 @@ export async function compileBundle(
                 if (!resourceDoc) {
                     throw new CompileError(
                         CompileErrorCode.DOC_MALFORMED,
-                        `${where}: resource binding ${binding.id} matches no ` +
-                            `resources/<name>/resource.ts of this provider ` +
-                            `(compiled: ${
+                        `${where}: ${label} binds ${binding.id} — matches ` +
+                            `no resources/<name>/resource.ts of this ` +
+                            `provider (compiled: ${
                                 Object.keys(providerResourceDocs).sort()
                                     .join(", ") || "none"
                             })`,
@@ -780,7 +789,7 @@ export async function compileBundle(
                     if (!match) {
                         throw new CompileError(
                             CompileErrorCode.DOC_MALFORMED,
-                            `${where}: resource.key ${binding.key} must be ` +
+                            `${where}: ${label} key ${binding.key} must be ` +
                                 `rooted at $.body / $.queryParams / $.pathParams`,
                         );
                     }
@@ -794,7 +803,7 @@ export async function compileBundle(
                     if (!(match[2] in properties)) {
                         throw new CompileError(
                             CompileErrorCode.DOC_MALFORMED,
-                            `${where}: resource.key ${binding.key} is a DEAD ` +
+                            `${where}: ${label} key ${binding.key} is a DEAD ` +
                                 `binding — "${
                                     match[2]
                                 }" is not a property of ` +
@@ -802,17 +811,9 @@ export async function compileBundle(
                         );
                     }
                 }
-                // input ⊇ inputs contract (design D30): the binding's
-                // interaction slot on the resource def is the CATALOG
-                // shape; the endpoint must be able to CARRY it.
-                const slotName = binding.interaction ===
-                        ResourceInteraction.CREATES
-                    ? "create"
-                    : binding.interaction === ResourceInteraction.UPDATES
-                    ? "update"
-                    : binding.interaction === ResourceInteraction.RELEASES
-                    ? "release"
-                    : undefined;
+                // input ⊇ inputs contract (design D30): the purpose's slot
+                // on the resource def is the CATALOG shape; the endpoint
+                // must be able to CARRY it.
                 const slot = slotName
                     ? resourceDoc.inputs?.[
                         slotName as keyof typeof resourceDoc.inputs
@@ -821,7 +822,7 @@ export async function compileBundle(
                 if (slot !== undefined) {
                     // the slot's REQUIRED properties are the contract an
                     // endpoint must be able to CARRY; optional slot keys
-                    // are per-endpoint (two UPDATES endpoints may take
+                    // are per-endpoint (two updates endpoints may take
                     // different optional surfaces — saperly's persona
                     // edit vs its webhook re-sync)
                     const slotRequired = Array.isArray(slot.required)
@@ -847,20 +848,79 @@ export async function compileBundle(
                         );
                     }
                 }
-                seedRef = binding.seed
+                const seed = binding.seed
                     ? await interner.intern(
                         binding.seed,
-                        `${endpointFile}#resource.seed`,
+                        `${endpointFile}#${label}.seed`,
                         SC.resourcesSince,
                     )
                     : undefined;
-                ensureRef = binding.ensure
+                const ensure = binding.ensure
                     ? await interner.intern(
                         binding.ensure,
-                        `${endpointFile}#resource.ensure`,
+                        `${endpointFile}#${label}.ensure`,
                         SC.resourcesSince,
                     )
                     : undefined;
+                if (seed) bindingRefs.push(seed);
+                if (ensure) bindingRefs.push(ensure);
+                return { seed, ensure };
+            };
+            type CompiledBindings = {
+                provisions?: Json[];
+                uses?: Json[];
+                updates?: Json[];
+                releases?: Json[];
+                reads?: Json[];
+            };
+            let compiledBindings: CompiledBindings | undefined;
+            if (bindingsSection) {
+                compiledBindings = {};
+                for (
+                    const [index, binding] of (bindingsSection.provisions ?? [])
+                        .entries()
+                ) {
+                    const { seed } = await compileBinding(
+                        binding,
+                        `resources.provisions[${index}]`,
+                        "create",
+                    );
+                    (compiledBindings.provisions ??= []).push({
+                        id: binding.id,
+                        seed: seed as unknown as Json,
+                    });
+                }
+                const slotOf = {
+                    uses: undefined,
+                    updates: "update",
+                    releases: "release",
+                    reads: undefined,
+                } as const;
+                for (const purpose of RESOURCE_GATE_ORDER) {
+                    const declared: Array<
+                        {
+                            id: string;
+                            key?: string;
+                            as?: string;
+                            ensure?: unknown;
+                        }
+                    > = bindingsSection[purpose] ?? [];
+                    for (const [index, binding] of declared.entries()) {
+                        const { ensure } = await compileBinding(
+                            binding,
+                            `resources.${purpose}[${index}]`,
+                            slotOf[purpose],
+                        );
+                        (compiledBindings[purpose] ??= []).push(
+                            pruneUndefined({
+                                id: binding.id,
+                                key: binding.key,
+                                as: binding.as,
+                                ensure: ensure as unknown as Json,
+                            }) as Json,
+                        );
+                    }
+                }
             }
 
             // ---- minEngineVersion: AUTO-ONLY ------------------------------
@@ -874,16 +934,16 @@ export async function compileBundle(
                 lifecycleStartRef,
                 lifecyclePollRef,
                 lifecycleStopRef,
-                seedRef,
-                ensureRef,
+                ...bindingRefs,
             ]
                 .filter((ref): ref is FnRef => ref !== undefined);
             const minEngineVersion = semverMax([
                 ...refs.map((ref) => interner.table[ref.$fn.key].api),
-                // a binding/cadence with no NEW fn (e.g. USES with neither
-                // seed nor ensure) still floors the doc: an older engine's
+                // a binding/cadence with no NEW fn (e.g. uses with neither
+                // key nor ensure) still floors the doc: an older engine's
                 // strictObject rejects the new keys outright.
-                ...(binding || def.usage?.updateEstimateEveryMs !== undefined
+                ...(bindingsSection ||
+                        def.usage?.updateEstimateEveryMs !== undefined
                     ? [SC.resourcesSince]
                     : []),
             ]);
@@ -940,14 +1000,10 @@ export async function compileBundle(
                         stateSchema: stateSchema as unknown as Json,
                     }
                     : undefined,
-                resource: binding
-                    ? {
-                        id: binding.id,
-                        interaction: binding.interaction,
-                        key: binding.key,
-                        seed: seedRef as unknown as Json,
-                        ensure: ensureRef as unknown as Json,
-                    }
+                resources: compiledBindings
+                    ? pruneUndefined(
+                        compiledBindings as Record<string, Json | undefined>,
+                    )
                     : undefined,
                 timeouts,
             }) as Record<string, Json>;

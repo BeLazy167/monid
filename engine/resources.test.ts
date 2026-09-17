@@ -1,6 +1,6 @@
 import { assert, assertEquals, assertRejects } from "@std/assert";
 import { z } from "zod";
-import type { ConnectorSource, OwnedResource } from "@shared/core";
+import type { ConnectorSource, Json, OwnedResource } from "@shared/core";
 import {
     defineEndpoint,
     defineProvider,
@@ -111,23 +111,24 @@ function resourceConnector(): ConnectorSource[] {
                             body: z.object({ color: z.string() }),
                         },
                     },
-                    resource: {
-                        id: "resdemo/widget",
-                        interaction: "CREATES",
-                        seed: ({ data, utils }) => {
-                            const id = utils.json.optionalStr(
-                                data.output,
-                                "$.id",
-                            );
-                            if (id === undefined) {
-                                throw new Error("no readable widget id");
-                            }
-                            return {
-                                resource: "resdemo/widget",
-                                externalId: id,
-                                data: { color: "red" },
-                            };
-                        },
+                    resources: {
+                        provisions: [{
+                            id: "resdemo/widget",
+                            seed: ({ data, utils }) => {
+                                const id = utils.json.optionalStr(
+                                    data.output,
+                                    "$.id",
+                                );
+                                if (id === undefined) {
+                                    throw new Error("no readable widget id");
+                                }
+                                return {
+                                    resource: "resdemo/widget",
+                                    externalId: id,
+                                    data: { color: "red" },
+                                };
+                            },
+                        }],
                     },
                 }),
             },
@@ -143,10 +144,8 @@ function resourceConnector(): ConnectorSource[] {
                     input: {
                         schema: { body: z.object({ id: z.string() }) },
                     },
-                    resource: {
-                        id: "resdemo/widget",
-                        interaction: "USES",
-                        key: "$.body.id",
+                    resources: {
+                        uses: [{ id: "resdemo/widget", key: "$.body.id" }],
                     },
                 }),
             },
@@ -162,20 +161,21 @@ function resourceConnector(): ConnectorSource[] {
                      *  collide with make's POST /widgets (design D22). */
                     endpoint: "/widgets/read",
                     request: { method: "GET", path: "/widgets" },
-                    resource: {
-                        id: "resdemo/widget",
-                        interaction: "READS",
-                        ensure: async ({ data, utils }) => {
-                            const owned = await utils.resources.owned({
-                                resource: "resdemo/widget",
-                            });
-                            if (owned.length > 0) return [];
-                            return [{
-                                resource: "resdemo/widget",
-                                externalId: data.scope.key + ":default",
-                                data: { color: "white" },
-                            }];
-                        },
+                    resources: {
+                        reads: [{
+                            id: "resdemo/widget",
+                            ensure: async ({ data, utils }) => {
+                                const owned = await utils.resources.owned({
+                                    resource: "resdemo/widget",
+                                });
+                                if (owned.length > 0) return [];
+                                return [{
+                                    resource: "resdemo/widget",
+                                    externalId: data.scope.key + ":default",
+                                    data: { color: "white" },
+                                }];
+                            },
+                        }],
                     },
                 }),
             },
@@ -301,6 +301,53 @@ Deno.test("resources: ownership gate — foreign is the uniform 404; owned proce
     }]);
 });
 
+Deno.test("resources: gated instances ride into lifecycle fns as data.resources[alias]", async () => {
+    const bundle = await bundleOf((connectors) => {
+        connectors[0].endpoints.push({
+            name: "echo",
+            def: defineEndpoint({
+                meta: {
+                    displayName: "Echo",
+                    summary: "Echoes the gated instance.",
+                    categories: ["demo-search"],
+                },
+                request: { method: "POST", path: "/widgets/echo" },
+                input: {
+                    schema: { body: z.object({ id: z.string() }) },
+                },
+                resources: {
+                    uses: [{
+                        id: "resdemo/widget",
+                        key: "$.body.id",
+                        as: "widget",
+                    }],
+                },
+                lifecycle: {
+                    // deno-lint-ignore require-await
+                    start: async ({ data }) => ({
+                        kind: "COMPLETED",
+                        httpStatus: 200,
+                        output: data.resources?.widget ?? null,
+                    }),
+                },
+            }),
+        });
+    });
+    const engine = new Engine({
+        transport: scripted([]),
+        resources: reader(OWNED),
+    });
+    const loaded = await engine.load(sealUnit(bundle, "resdemo#widgets/echo"));
+    const done = await loaded.run({ body: { id: "w-1" } });
+    // the alias comes from `as`; the instance is the reader's row
+    assertEquals(done.output, OWNED[0] as unknown as Json);
+    // and the keyed uses binding still lands its settle mark
+    assertEquals(done.resources?.reconciles, [{
+        resource: "resdemo/widget",
+        externalId: "w-1",
+    }]);
+});
+
 Deno.test("resources: a seed that cannot construct is PROVISION_CONSTRUCT", async () => {
     const bundle = await bundleOf();
     const engine = new Engine({
@@ -405,7 +452,7 @@ Deno.test("resources compiler: unknown binding id and dead keys are compile erro
     await assertRejects(
         () =>
             bundleOf((connectors) => {
-                connectors[0].endpoints[1].def.resource!.id =
+                connectors[0].endpoints[1].def.resources!.uses![0].id =
                     "resdemo/nonexistent";
             }),
         CompileError,
@@ -414,7 +461,7 @@ Deno.test("resources compiler: unknown binding id and dead keys are compile erro
     await assertRejects(
         () =>
             bundleOf((connectors) => {
-                connectors[0].endpoints[1].def.resource!.key =
+                connectors[0].endpoints[1].def.resources!.uses![0].key =
                     "$.body.notAnInput";
             }),
         CompileError,

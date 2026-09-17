@@ -18,6 +18,7 @@ import type { z } from "zod";
 import type { Json } from "../json/type.ts";
 import type { FnUtils, HookLogger } from "../hooks/ctx.ts";
 import type {
+    GatedResources,
     LifecycleRequestInfo,
     LifecycleRunInfo,
     LifecycleUtils,
@@ -123,6 +124,10 @@ export interface TypedLifecycleStartCtx<
         input: TypedRunInput<B, Q>;
         request: LifecycleRequestInfo;
         run: LifecycleRunInfo;
+        /** The GATED INSTANCES (design D43): every keyed binding's owned
+         *  resource by alias — present iff the doc declares keyed
+         *  bindings and the gate found rows. */
+        resources?: GatedResources;
     };
     utils: LifecycleUtils;
     logger: HookLogger;
@@ -137,6 +142,7 @@ export interface TypedLifecycleTickCtx<
         input: TypedRunInput<B, Q>;
         request: LifecycleRequestInfo;
         run: LifecycleRunInfo;
+        resources?: GatedResources;
         lifecycle: { state: TypedRunState<SD> };
     };
     utils: LifecycleUtils;

@@ -4,7 +4,11 @@ import { type Json, zJson } from "../json/type.ts";
 import { zRunInput } from "../run/input.ts";
 import { RunKind, zFnState, zRunState } from "../run/state.ts";
 import { fnCarrier, type FnUtils, type HookLogger } from "./ctx.ts";
-import type { OwnedResource, ResourceQuery } from "../resource/row.ts";
+import {
+    type OwnedResource,
+    type ResourceQuery,
+    zOwnedResource,
+} from "../resource/row.ts";
 
 /**
  * THE LIFECYCLE HOOK FAMILY — `lifecycle.start` / `lifecycle.poll` /
@@ -199,12 +203,24 @@ export const zLifecycleRunInfo = z.strictObject({
 });
 export type LifecycleRunInfo = z.infer<typeof zLifecycleRunInfo>;
 
+/** The GATED INSTANCES (design D43): every keyed binding's owned
+ *  resource, by alias (`as` ?? the key path's last segment) — fetched
+ *  fresh each tick from the host's reader, already ownership-gated.
+ *  Absent when the doc declares no keyed bindings. */
+export const zGatedResources = z.record(
+    z.string().min(1),
+    zOwnedResource,
+);
+export type GatedResources = z.infer<typeof zGatedResources>;
+
 /** ctx.data for lifecycle.start — the validated (post-toRequest) input +
- *  the compiled request + the run identity. */
+ *  the compiled request + the run identity (+ the gated instances when
+ *  the doc's bindings carry keys). */
 export const zLifecycleStartData = z.strictObject({
     input: zRunInput,
     request: zLifecycleRequestInfo,
     run: zLifecycleRunInfo,
+    resources: zGatedResources.optional(),
 });
 export type LifecycleStartData = z.infer<typeof zLifecycleStartData>;
 
@@ -217,6 +233,7 @@ export const zLifecycleTickData = z.strictObject({
     input: zRunInput,
     request: zLifecycleRequestInfo,
     run: zLifecycleRunInfo,
+    resources: zGatedResources.optional(),
     lifecycle: z.strictObject({ state: zRunState }),
 });
 export type LifecycleTickData = z.infer<typeof zLifecycleTickData>;
