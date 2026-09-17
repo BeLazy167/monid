@@ -26,14 +26,14 @@ import { zResourceRow, zResourceTarget } from "./row.ts";
  * (the upstream HTTP anatomy of the meter).
  */
 
-/** Period anchoring (design D31): CREATION = rolling from the provision
- *  moment (the v1 behavior — saperly, agentmail). CALENDAR = UTC calendar
- *  boundaries (midnight / the 1st) for vendors that invoice on calendar
- *  periods; the HOST rule: the FIRST period is the partial remainder from
- *  creation to the next boundary (rent pro-rated, variable settled over
- *  the short window), then full periods tile. */
+/** Period anchoring (design D31/D38): CREATION_TIME = rolling from the
+ *  provision moment (the v1 behavior — saperly, agentmail). CALENDAR =
+ *  UTC calendar boundaries (midnight / the 1st) for vendors that invoice
+ *  on calendar periods; the HOST rule: the FIRST period is the partial
+ *  remainder from creation to the next boundary, then full periods
+ *  tile. */
 export const PeriodAnchor = {
-    CREATION: "CREATION",
+    CREATION_TIME: "CREATION_TIME",
     CALENDAR: "CALENDAR",
 } as const;
 export type PeriodAnchor = (typeof PeriodAnchor)[keyof typeof PeriodAnchor];
@@ -41,9 +41,7 @@ export type PeriodAnchor = (typeof PeriodAnchor)[keyof typeof PeriodAnchor];
 export const zBillingPeriod = z.strictObject({
     unit: z.enum(["DAY", "WEEK", "MONTH", "YEAR"]),
     count: z.number().int().positive(),
-    anchor: z.enum(
-        Object.values(PeriodAnchor) as [PeriodAnchor, ...PeriodAnchor[]],
-    ).default(PeriodAnchor.CREATION),
+    anchor: z.enum(PeriodAnchor).default(PeriodAnchor.CREATION_TIME),
 });
 export type BillingPeriod = z.infer<typeof zBillingPeriod>;
 

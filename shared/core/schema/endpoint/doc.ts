@@ -89,14 +89,11 @@ export const zEndpointDoc = z.strictObject({
          *  A resolved claim WINS over the derived fold at settle
          *  (design D27). */
         consolidate: zFnRef.optional(),
-        /** Mid-run cost curve (design D35) — requires lifecycle.poll
-         *  (compile-checked). */
-        accrue: z.strictObject({
-            intervalMs: z.number().int().positive(),
-            counts: zFnRef,
-            buffer: z.record(z.string().min(1), z.number().nonnegative())
-                .optional(),
-        }).optional(),
+        /** The estimate re-run cadence (design D40) — PRESENT means the
+         *  estimate reads `elapsedMs` and hosts re-price the hold on
+         *  this cadence while RUNNING. Requires lifecycle.poll + a
+         *  metered model (compile-checked). */
+        updateEstimateEveryMs: z.number().int().positive().optional(),
     }),
     /**
      * Async run protocol (engine ≥ config schema.async_since). When present
@@ -137,7 +134,6 @@ export function fnKeysOf(doc: EndpointDoc): string[] {
     keys.push(doc.usage.estimate.$fn.key);
     keys.push(doc.usage.evidence.$fn.key);
     if (doc.usage.consolidate) keys.push(doc.usage.consolidate.$fn.key);
-    if (doc.usage.accrue) keys.push(doc.usage.accrue.counts.$fn.key);
     if (doc.lifecycle) {
         keys.push(doc.lifecycle.start.$fn.key);
         if (doc.lifecycle.poll) keys.push(doc.lifecycle.poll.$fn.key);

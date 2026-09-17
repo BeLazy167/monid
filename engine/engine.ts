@@ -277,7 +277,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
      *  card (design D26): the returned Usage is `{credits, evidence}` —
      *  the priced vector plus the per-line why, re-derivable by anyone
      *  holding the doc. */
-    estimate(runInput: RunInput): Usage {
+    estimate(runInput: RunInput, elapsedMs?: number): Usage {
         // PRE-toRequest input (design D25): the estimate is a promise about
         // the CALLER's request, so it reads the schema-shaped validated
         // input (defaults materialized) — NOT the wire reshape (akta's
@@ -288,6 +288,8 @@ export class LoadedEndpoint implements RunnableEndpoint {
         if (this.fns.usageEstimate) {
             fnUsage = this.fns.usageEstimate({
                 input,
+                // design D40: absent at admission; set on cadenced re-runs
+                ...(elapsedMs !== undefined ? { elapsedMs } : {}),
                 usage: { model },
             });
             // the fn's promise: metered line quantities only
@@ -414,7 +416,8 @@ export class LoadedEndpoint implements RunnableEndpoint {
      * void (or no stop fn / a swallowed failure on an unmetered doc) is
      * STOPPED_UNSETTLED — the exact pre-resource posture, now stated.
      * NEVER throws for fn failures (cleanup never masks the outcome):
-     * a throw on a doc that bills mid-run work (usage.accrue) surfaces
+     * a throw on a doc that bills mid-run work (updateEstimateEveryMs)
+     * surfaces
      * as UNRESOLVED — someone must go look before money settles.
      */
     async stop(
@@ -473,7 +476,7 @@ export class LoadedEndpoint implements RunnableEndpoint {
                 error: String(error),
             });
             // a metered doc's failed teardown is a money question — flag it
-            if (this.doc.usage.accrue) {
+            if (this.doc.usage.updateEstimateEveryMs !== undefined) {
                 return {
                     kind: StopKind.UNRESOLVED,
                     reason: `lifecycle.stop failed: ${error}`,
@@ -550,26 +553,15 @@ export class LoadedEndpoint implements RunnableEndpoint {
         return { runId: run?.runId ?? crypto.randomUUID() };
     }
 
-    /** MID-RUN accrued cost (design D35) — PURE: the accrue counts fn on
-     *  elapsedMs, the declared per-key buffer added on top, folded
-     *  through the doc's own rate card. Docs without usage.accrue fall
-     *  back to the estimate (a flat promise IS its own curve). */
+    /** MID-RUN accrued cost (design D40) — the ESTIMATE, re-run with
+     *  `elapsedMs` set ("the price is an estimation, and it syncs once
+     *  in a while"). Docs without `usage.updateEstimateEveryMs` return
+     *  the static estimate (a flat promise IS its own curve). */
     accrued(runInput: RunInput, elapsedMs: number): Usage {
-        const accrue = this.doc.usage.accrue;
-        if (!accrue || !this.fns.accrueCounts) return this.estimate(runInput);
-        const input = validateInput(this.doc, runInput);
-        const model = this.doc.usage.model;
-        const fnUsage = this.fns.accrueCounts({
-            elapsedMs: Math.max(0, elapsedMs),
-            input,
-            usage: { model },
-        });
-        this.validateUsage(fnUsage);
-        const counts = { ...fnUsage.counts };
-        for (const [key, extra] of Object.entries(accrue.buffer ?? {})) {
-            counts[key] = (counts[key] ?? 0) + extra;
+        if (this.doc.usage.updateEstimateEveryMs === undefined) {
+            return this.estimate(runInput);
         }
-        return assembleUsage(model, counts);
+        return this.estimate(runInput, Math.max(0, elapsedMs));
     }
 
     /** The compiled request as DATA into lifecycle fns ({pathParam}s

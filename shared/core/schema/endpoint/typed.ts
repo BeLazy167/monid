@@ -94,11 +94,12 @@ export interface TypedEnvelopeCtx<
     logger: HookLogger;
 }
 
-/** The estimate ctx, body-typed (input-only — the estimate is the
- *  settle's promise, made before the vendor is touched). */
+/** The estimate ctx, body-typed. `elapsedMs` is absent at admission and
+ *  set on cadenced re-runs (design D40) — one fn, two moments. */
 export interface TypedEstimateCtx<B, Q = Record<string, Json> | undefined> {
     data: {
         input: TypedRunInput<B, Q>;
+        elapsedMs?: number;
         usage: { model: UsageModel };
     };
     utils: FnUtils;

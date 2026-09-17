@@ -420,7 +420,7 @@ Deno.test("resources compiler: unknown binding id and dead keys are compile erro
     );
 });
 
-Deno.test("resources compiler: accrue demands a pollable metered run", async () => {
+Deno.test("resources compiler: updateEstimateEveryMs demands a pollable metered run", async () => {
     await assertRejects(
         () =>
             bundleOf((connectors) => {
@@ -434,13 +434,10 @@ Deno.test("resources compiler: accrue demands a pollable metered run", async () 
                     credits: { default: { label: "demo credits" } },
                     estimate: () => ({ counts: { SECOND: 1 } }),
                     evidence: () => ({ counts: { SECOND: 1 } }),
-                    accrue: {
-                        intervalMs: 30_000,
-                        counts: () => ({ counts: { SECOND: 1 } }),
-                    },
+                    updateEstimateEveryMs: 30_000,
                 };
             }),
         CompileError,
-        "usage.accrue is dead config",
+        "usage.updateEstimateEveryMs is dead config",
     );
 });

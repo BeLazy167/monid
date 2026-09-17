@@ -2,8 +2,8 @@ import { z } from "zod";
 import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
 import { zE164, zNumberId } from "../../../schema/common.ts";
 import {
-    callAccrueCounts,
     callConsolidate,
+    callEstimate,
     callEvidence,
     pollCallRun,
     stopCallRun,
@@ -14,9 +14,9 @@ import {
  * the RUN is the call. It stays RUNNING for the life of the call,
  * completes with duration + cost when the carrier finalizes, and STOPPING
  * the run IS the hangup (stop settles the metered work — design D34).
- * The hold GROWS with the call (usage.accrue on a 30 s cadence with 60 s
- * of buffered runway — design D35): a call can never outrun its hold by
- * more than one interval + buffer.
+ * The hold GROWS with the call: the shared estimate re-runs every 30 s
+ * (usage.updateEstimateEveryMs — design D40), so a call can never outrun
+ * its hold by more than one cadence tick.
  *
  * USES binding: `fromNumberId` must be a number THIS workspace owns —
  * the engine pre-gates (uniform 404 for foreign ids, upstream never
@@ -54,8 +54,8 @@ export default defineEndpoint({
         notes: [
             "Billing is per SECOND pro-rata; an unanswered call bills " +
             "nothing (ring time never bills).",
-            "A live call accrues cost continuously — the hold grows on a " +
-            "30-second clock while the run is RUNNING.",
+            "A live call accrues cost continuously — the estimate " +
+            "re-prices on a 30-second clock while the run is RUNNING.",
         ],
     },
     endpoint: "/place-calls",
@@ -83,14 +83,9 @@ export default defineEndpoint({
             label: "call time",
             consumes: { credit: "default", amount: 0.28 },
         },
-        /** admission floor: one minute. */
-        estimate: () => ({ counts: { SECOND: 60 } }),
-        accrue: {
-            intervalMs: 30_000,
-            counts: callAccrueCounts,
-            /** one minute of runway on top of every reading. */
-            buffer: { SECOND: 60 },
-        },
+        estimate: callEstimate,
+        /** re-price the hold every 30 s while the call is live. */
+        updateEstimateEveryMs: 30_000,
         evidence: callEvidence,
         consolidate: callConsolidate,
     },

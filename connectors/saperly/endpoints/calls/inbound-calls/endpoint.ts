@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
 import {
-    callAccrueCounts,
     callConsolidate,
+    callEstimate,
     callEvidence,
     pollCallRun,
     stopCallRun,
@@ -15,7 +15,7 @@ import {
  * ALREADY EXISTS (the caller started it), so start performs NO upstream
  * call — it ADOPTS the event-carried callId as externalRunId and goes
  * straight to RUNNING. From there the lifecycle IS /place-calls' — poll,
- * stop, evidence, consolidate, and accrue are the SAME fn values, so the
+ * stop, evidence, consolidate, and estimate are the SAME fn values, so the
  * compiler interns ONE entry each (billing truth is provably the same
  * code either way).
  *
@@ -84,12 +84,8 @@ export default defineEndpoint({
             label: "call time",
             consumes: { credit: "default", amount: 0.28 },
         },
-        estimate: () => ({ counts: { SECOND: 60 } }),
-        accrue: {
-            intervalMs: 30_000,
-            counts: callAccrueCounts,
-            buffer: { SECOND: 60 },
-        },
+        estimate: callEstimate,
+        updateEstimateEveryMs: 30_000,
         evidence: callEvidence,
         consolidate: callConsolidate,
     },

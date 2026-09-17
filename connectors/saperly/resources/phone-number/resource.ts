@@ -71,7 +71,7 @@ export default defineResource({
         release: z.object({ numberId: zNumberId }),
     },
     billing: {
-        period: { unit: "MONTH", count: 1, anchor: "CREATION" },
+        period: { unit: "MONTH", count: 1, anchor: "CREATION_TIME" },
         rent: {
             consumes: { credit: "default", amount: 2 },
             chargeLeadMs: 3 * 24 * 3_600_000,

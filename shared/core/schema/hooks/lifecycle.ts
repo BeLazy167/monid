@@ -319,6 +319,8 @@ export const StopKind = {
 } as const;
 export type StopKind = (typeof StopKind)[keyof typeof StopKind];
 
+export const zStopKind = z.enum(StopKind);
+
 export const zLifecycleUnresolved = z.strictObject({
     kind: z.literal(StopKind.UNRESOLVED),
     /** Operator-facing: what the fn last saw (logged + surfaced). */

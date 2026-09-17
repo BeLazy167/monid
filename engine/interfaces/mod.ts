@@ -146,14 +146,14 @@ export interface RunHandle {
 
 export interface RunnableEndpoint {
     readonly doc: EndpointDoc;
-    /** Pre-run cost estimate — PURE (no IO, no state): validated input →
-     *  estimated Usage in consolidate's units. Absent usage.estimate on
-     *  the doc ⇒ one CALL unit. */
-    estimate(runInput: RunInput): Usage;
-    /** MID-RUN accrued cost (design D35) — PURE: elapsed ms since the
-     *  admitted start → Usage consumed so far (accrue counts + declared
-     *  buffer, folded through the doc's own rate card). Docs without
-     *  usage.accrue return the estimate (the flat promise IS the curve). */
+    /** Cost estimate — PURE (no IO, no state): validated input →
+     *  estimated Usage. `elapsedMs` (design D40) re-runs the SAME
+     *  estimate mid-flight for docs declaring
+     *  `usage.updateEstimateEveryMs` — the price is an estimation, and
+     *  it syncs on that cadence. */
+    estimate(runInput: RunInput, elapsedMs?: number): Usage;
+    /** Sugar: `estimate(runInput, elapsedMs)` for cadenced docs; the
+     *  static estimate otherwise. */
     accrued(runInput: RunInput, elapsedMs: number): Usage;
     /** PRE-RUN prerequisites (design D32, v1 ensureResources): runs the
      *  binding's `ensure` fn (validated input + the host scope token) and

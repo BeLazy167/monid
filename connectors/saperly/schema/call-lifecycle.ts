@@ -225,12 +225,14 @@ export const callConsolidate = (
         : { credits: { default: cents / 100 } };
 };
 
-/** The SHARED accrue curve: elapsed seconds, floored at the 60 s
- *  admission minimum (the buffer adds runway on top). */
-export const callAccrueCounts = (
-    { data }: { data: { elapsedMs: number } },
+/** The SHARED estimate (design D40 — one fn, two moments): at admission
+ *  `elapsedMs` is absent → the 60 s floor prices the initial hold of an
+ *  UNBOUNDED call; on `updateEstimateEveryMs` re-runs it prices the
+ *  elapsed seconds — the estimation that syncs while the call is live. */
+export const callEstimate = (
+    { data }: { data: { elapsedMs?: number } },
 ): { counts: Record<string, number> } => ({
     counts: {
-        SECOND: Math.max(Math.ceil(data.elapsedMs / 1000), 60),
+        SECOND: Math.max(Math.ceil((data.elapsedMs ?? 0) / 1000), 60),
     },
 });

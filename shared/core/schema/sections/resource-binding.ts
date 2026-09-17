@@ -37,12 +37,7 @@ export const ResourceInteraction = {
 export type ResourceInteraction =
     (typeof ResourceInteraction)[keyof typeof ResourceInteraction];
 
-export const zResourceInteraction = z.enum(
-    Object.values(ResourceInteraction) as [
-        ResourceInteraction,
-        ...ResourceInteraction[],
-    ],
-);
+export const zResourceInteraction = z.enum(ResourceInteraction);
 
 export const zResourceBindingSection = z.strictObject({
     /** The bound resource doc — "<provider>/<name>"; same-provider

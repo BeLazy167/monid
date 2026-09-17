@@ -36,8 +36,6 @@ import {
     type ResourceOpUtils,
     type RunInput,
     type ToRequestData,
-    UsageAccrueContract,
-    type UsageAccrueFn,
     UsageConsolidateContract,
     type UsageConsolidateFn,
     UsageEstimateContract,
@@ -60,7 +58,6 @@ import {
     zResourceOpData,
 } from "@shared/core";
 import type {
-    AccrueData,
     ActualCost,
     ActualCostData,
     CheckOutcome,
@@ -116,8 +113,6 @@ export interface LinkedFns {
         data: LifecycleTickData,
         utils: LifecycleUtils,
     ) => Promise<LifecycleStopOutcome | undefined>;
-    /** Mid-run cost curve (design D35): elapsed → metered counts. */
-    accrueCounts?: (data: AccrueData) => FnUsage;
     /** CREATES seed (design D32): settled envelope → provision | null. */
     seed?: (data: ProvisionSeedData) => ProvisionSeed | null;
     /** Pre-run prerequisites (design D32): effectful, full lifecycle
@@ -607,20 +602,6 @@ export async function linkFns(
                 logger,
             );
         }
-    }
-    if (doc.usage.accrue) {
-        linked.accrueCounts = wrapContract<AccrueData, FnUsage, UsageAccrueFn>(
-            UsageAccrueContract,
-            await resolveFn(
-                doc.usage.accrue.counts,
-                fns,
-                engineVersion,
-                `${doc.id}#usage.accrue.counts`,
-            ),
-            doc.id,
-            "usage.accrue.counts",
-            logger,
-        );
     }
     if (doc.resource?.seed) {
         linked.seed = wrapSeed(

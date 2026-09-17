@@ -720,33 +720,27 @@ export async function compileBundle(
                 ),
             };
 
-            // ---- usage.accrue: the mid-run curve (design D35) -------------
-            // Coherence: only a POLLABLE run has a mid-flight to price, and
-            // only METERED lines give the curve anything to say.
-            if (def.usage?.accrue) {
+            // ---- usage.updateEstimateEveryMs (design D40) -----------------
+            // Coherence: only a POLLABLE run has a mid-flight to re-price,
+            // and only METERED lines give the estimate anything to vary.
+            if (def.usage?.updateEstimateEveryMs !== undefined) {
                 if (!lifecyclePoll) {
                     throw new CompileError(
                         CompileErrorCode.DOC_MALFORMED,
-                        `${where}: usage.accrue is dead config — no resolved ` +
-                            `lifecycle.poll (only a pollable run has a ` +
-                            `mid-flight to price)`,
+                        `${where}: usage.updateEstimateEveryMs is dead ` +
+                            `config — no resolved lifecycle.poll (only a ` +
+                            `pollable run has a mid-flight to re-price)`,
                     );
                 }
                 if (!metered) {
                     throw new CompileError(
                         CompileErrorCode.DOC_MALFORMED,
-                        `${where}: usage.accrue on a model with no metered ` +
-                            `lines — nothing accrues on a flat/free model`,
+                        `${where}: usage.updateEstimateEveryMs on a model ` +
+                            `with no metered lines — a flat/free estimate ` +
+                            `cannot vary`,
                     );
                 }
             }
-            const accrueCountsRef = def.usage?.accrue
-                ? await interner.intern(
-                    def.usage.accrue.counts,
-                    `${endpointFile}#usage.accrue.counts`,
-                    SC.resourcesSince,
-                )
-                : undefined;
 
             // ---- resource binding (design D32) ----------------------------
             const binding = def.resource;
@@ -879,17 +873,18 @@ export async function compileBundle(
                 lifecycleStartRef,
                 lifecyclePollRef,
                 lifecycleStopRef,
-                accrueCountsRef,
                 seedRef,
                 ensureRef,
             ]
                 .filter((ref): ref is FnRef => ref !== undefined);
             const minEngineVersion = semverMax([
                 ...refs.map((ref) => interner.table[ref.$fn.key].api),
-                // a binding/accrue with no NEW fn (e.g. USES with neither
+                // a binding/cadence with no NEW fn (e.g. USES with neither
                 // seed nor ensure) still floors the doc: an older engine's
                 // strictObject rejects the new keys outright.
-                ...(binding || def.usage?.accrue ? [SC.resourcesSince] : []),
+                ...(binding || def.usage?.updateEstimateEveryMs !== undefined
+                    ? [SC.resourcesSince]
+                    : []),
             ]);
 
             // ---- assemble + validate --------------------------------------
@@ -934,14 +929,7 @@ export async function compileBundle(
                     estimate: estimateRef as unknown as Json,
                     evidence: evidenceRef as unknown as Json,
                     consolidate: consolidateRef as unknown as Json,
-                    accrue: def.usage?.accrue
-                        ? {
-                            intervalMs: def.usage.accrue.intervalMs,
-                            counts: accrueCountsRef as unknown as Json,
-                            buffer: def.usage.accrue
-                                .buffer as unknown as Json,
-                        }
-                        : undefined,
+                    updateEstimateEveryMs: def.usage?.updateEstimateEveryMs,
                 },
                 lifecycle: lifecycleStartRef
                     ? {

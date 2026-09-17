@@ -267,11 +267,12 @@ Deno.test("saperly place-calls: estimate floors at one minute; accrued() prices 
         // no fixture: estimate/accrued are PURE — zero upstream calls
         resources: OWNED,
     });
-    // 60 s floor → ceil(60/60) × $0.28
+    // admission: elapsedMs absent → the fn's 60 s floor → 1 × $0.28
     assertEquals(loaded.estimate(CALL_INPUT).credits, { default: 0.28 });
-    // 150 s elapsed + 60 s buffer = 210 s → ceil(210/60) = 4 × $0.28
+    // the SAME estimate re-run mid-flight (design D40): 240 s elapsed →
+    // ceil(240/60) = 4 × $0.28
     assertEquals(
-        loaded.accrued(CALL_INPUT, 150_000).credits,
+        loaded.accrued(CALL_INPUT, 240_000).credits,
         { default: 1.12 },
     );
 });
