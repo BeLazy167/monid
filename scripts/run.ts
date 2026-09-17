@@ -22,6 +22,7 @@ import {
 } from "@shared/core";
 import { directTransport, Engine } from "@monid/connector-engine";
 import { compileToOutput } from "./lib.ts";
+import { KvResourceStore } from "./store/kv.ts";
 
 function parseJson(flag: string, raw: string): Json {
     try {
@@ -45,9 +46,10 @@ const { options, args } = await new Command()
     .option("--path-params <json:string>", "RunInput.pathParams (JSON object).")
     .option(
         "--resources <file:string>",
-        "Owned-resource rows (a JSON file of OwnedResource[]) served to the " +
-            "ownership window. Bound endpoints run against an EMPTY " +
-            "window when omitted (foreign ids answer the uniform 404).",
+        "Owned-resource rows (a JSON file of OwnedResource[]) served to " +
+            "the ownership window INSTEAD of the local store — a fixture " +
+            "window, nothing persisted. Default: the Deno KV store at " +
+            ".output/local.db (provisions survive across runs).",
     )
     .option(
         "--scope-key <key:string>",
@@ -86,9 +88,14 @@ console.error(
     } — loading ${endpointId}`,
 );
 
-// the CLI's ownership window: fixture rows from --resources, else empty
-// (bound endpoints still LOAD; ownership misses answer the uniform 404)
-const rows: OwnedResource[] = options.resources !== undefined
+// the CLI's ownership window (design D47): the Deno KV store at
+// .output/local.db by DEFAULT — the local host loop's persistence, so a
+// provision made by one run is owned in the next. --resources swaps in a
+// fixture window (rows from a file, NOTHING persisted).
+const store = options.resources === undefined
+    ? await KvResourceStore.open()
+    : undefined;
+const fixtureRows: OwnedResource[] = options.resources !== undefined
     ? parseSchema(
         z.array(zOwnedResource),
         JSON.parse(await Deno.readTextFile(options.resources)),
@@ -99,10 +106,10 @@ const rows: OwnedResource[] = options.resources !== undefined
 const unit = sealUnit(bundle, endpointId);
 const engine = new Engine({
     transport: directTransport(),
-    resources: {
+    resources: store ?? {
         owned: (query) =>
             Promise.resolve(
-                rows.filter((row) =>
+                fixtureRows.filter((row) =>
                     row.resource === query.resource &&
                     (query.externalId === undefined ||
                         row.externalId === query.externalId)
@@ -112,8 +119,65 @@ const engine = new Engine({
     scopeKey: options.scopeKey ?? "local",
 });
 const loaded = await engine.load(unit);
-// run() executes ensure() inline first (v1 ordering) and logs its seeds
+
+// HOST ORDERING (v1): run ensure() as its own pre-start step and PERSIST
+// its seeds BEFORE the run — a mid-run crash never orphans an upstream
+// resource. run()'s own inline ensure then sees the persisted rows and
+// converges to [] (ensure fns are idempotent against the window).
+if (store) {
+    const seeds = await loaded.ensure(input);
+    for (const seed of seeds) {
+        await store.provision({
+            resource: seed.resource,
+            externalId: seed.externalId,
+            data: seed.data,
+        });
+        console.error(
+            `[engine:run] ensure provisioned ${seed.resource} ` +
+                `"${seed.identifier ?? seed.externalId}" — persisted`,
+        );
+    }
+}
 const result = await loaded.run(input);
+
+// settle EFFECTS → the store (the host's persistence work-orders)
+if (store && result.resources) {
+    for (const seed of result.resources.provisions ?? []) {
+        await store.provision({
+            resource: seed.resource,
+            externalId: seed.externalId,
+            data: seed.data,
+        });
+        console.error(
+            `[engine:run] provisioned ${seed.resource} ` +
+                `"${seed.identifier ?? seed.externalId}" — persisted` +
+                (seed.observedUsage !== undefined
+                    ? ` (observed usage: ${JSON.stringify(seed.observedUsage)})`
+                    : ""),
+        );
+    }
+    for (const target of result.resources.releases ?? []) {
+        await store.release(target.resource, target.externalId);
+        console.error(
+            `[engine:run] released ${target.resource} ` +
+                `"${target.externalId}" — left the ownership window`,
+        );
+    }
+    for (const target of result.resources.refreshes ?? []) {
+        console.error(
+            `[engine:run] refresh marked for ${target.resource} ` +
+                `"${target.externalId}" — a host loop runs the resource ` +
+                `doc's lifecycle.refresh (or: deno task webhook simulate)`,
+        );
+    }
+    for (const target of result.resources.reconciles ?? []) {
+        console.error(
+            `[engine:run] usage reconcile marked for ${target.resource} ` +
+                `"${target.externalId}"`,
+        );
+    }
+}
+store?.close();
 
 console.log(JSON.stringify(result, null, 2));
 if (result.isProviderError) Deno.exit(1);

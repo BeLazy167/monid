@@ -7,6 +7,7 @@ export {
 export type {
     ConnectorEngine,
     EngineCtx,
+    IResourceStore,
     ParamsResolver,
     PreparedRequest,
     ResourceReader,
@@ -36,6 +37,7 @@ export {
     sniffDecode,
 } from "./transport.ts";
 export {
+    instantiate,
     type LinkedFns,
     type LinkedResourceFns,
     linkFns,
