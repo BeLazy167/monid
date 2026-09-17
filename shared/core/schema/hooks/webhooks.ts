@@ -16,12 +16,16 @@ import { zOwnedResource, zResourceTarget } from "../resource/row.ts";
  *
  *   - `verify`: DECLARATIVE (an HMAC descriptor — no crypto in fns; the
  *     host executes it).
- *   - `correlate`: PURE — WHO the delivery belongs to.
- *   - `dispatch`: PURE — WHAT to do (a closed action vocabulary).
+ *   - `route`: PURE — ONE verdict per delivery (design D44): WHO it
+ *     belongs to (the correlation vocabulary) and WHAT to do (the closed
+ *     action vocabulary). One delivery, one read — the v1
+ *     correlate/dispatch pair collapsed (they always read the same
+ *     envelope fields twice).
  *   - `subscribe`/`unsubscribe`: EFFECTFUL upstream registration, for
- *     vendors WITH a registration API. An account hook without `subscribe`
- *     is MANUAL: the host boot-reconcile ensures the routing row and LOGS
- *     the callback URL to paste in the vendor dashboard (saperly).
+ *     vendors WITH a registration API. A provider hook without
+ *     `subscribe` is MANUAL: the host boot-reconcile ensures the routing
+ *     row and LOGS the callback URL to paste in the vendor dashboard
+ *     (saperly).
  */
 
 // ---------------------------------------------------------------------------
@@ -32,14 +36,22 @@ export const zWebhookVerify = z.strictObject({
     scheme: z.literal("hmac-sha256"),
     signatureHeader: z.string().min(1),
     timestampHeader: z.string().min(1),
-    /** The signed payload template — the one supported spelling today. */
-    payload: z.literal("${timestamp}.${rawBody}"),
+    /** The signed payload TEMPLATE (design D45): `${rawBody}` (the EXACT
+     *  raw bytes — required: a signature that doesn't cover the body
+     *  verifies nothing) and optionally `${timestamp}` (the timestamp
+     *  header's value), joined with any literal glue the vendor
+     *  specifies (saperly: "${timestamp}.${rawBody}"). */
+    payload: z.string().min(1).refine(
+        (template) => template.includes("${rawBody}"),
+        "verify.payload must contain ${rawBody} — a signature that " +
+            "does not cover the raw bytes verifies nothing",
+    ),
     toleranceMs: z.number().int().positive(),
 });
 export type WebhookVerify = z.infer<typeof zWebhookVerify>;
 
 // ---------------------------------------------------------------------------
-// correlate — WHO
+// route — WHO + WHAT, one verdict (design D44)
 // ---------------------------------------------------------------------------
 
 /** One verified delivery as fns see it: lower-cased headers + the
@@ -50,10 +62,10 @@ export const zWebhookDelivery = z.strictObject({
 });
 export type WebhookDelivery = z.infer<typeof zWebhookDelivery>;
 
-export const zWebhookCorrelateData = z.strictObject({
+export const zWebhookRouteData = z.strictObject({
     delivery: zWebhookDelivery,
 });
-export type WebhookCorrelateData = z.infer<typeof zWebhookCorrelateData>;
+export type WebhookRouteData = z.infer<typeof zWebhookRouteData>;
 
 /**
  * Correlation kinds → host resolution:
@@ -78,21 +90,6 @@ export const zWebhookCorrelation = z.discriminatedUnion("kind", [
     z.strictObject({ kind: z.literal("unhandled"), event: z.string() }),
 ]);
 export type WebhookCorrelation = z.infer<typeof zWebhookCorrelation>;
-
-export type WebhookCorrelateFn = (
-    ctx: {
-        data: WebhookCorrelateData;
-        utils: FnUtils;
-        logger: HookLogger;
-    },
-) => WebhookCorrelation;
-export const zWebhookCorrelateFn = fnCarrier<WebhookCorrelateFn>(
-    "a webhooks correlate fn",
-);
-
-// ---------------------------------------------------------------------------
-// dispatch — WHAT (the closed v1 action vocabulary)
-// ---------------------------------------------------------------------------
 
 /**
  *   - `run`: START A RUN of `endpoint` in the correlated workspace — the
@@ -128,15 +125,25 @@ export const zWebhookAction = z.discriminatedUnion("action", [
 ]);
 export type WebhookAction = z.infer<typeof zWebhookAction>;
 
-export type WebhookDispatchFn = (
+/** The route VERDICT: who + what, decided in ONE read of the delivery.
+ *  `who: unhandled` pairs with `what: ignore` by convention (the host
+ *  drops with the event name); a mapped who may still `ignore` (stated
+ *  policy — saperly's outbound delivery receipts). */
+export const zWebhookRoute = z.strictObject({
+    who: zWebhookCorrelation,
+    what: zWebhookAction,
+});
+export type WebhookRoute = z.infer<typeof zWebhookRoute>;
+
+export type WebhookRouteFn = (
     ctx: {
-        data: WebhookCorrelateData;
+        data: WebhookRouteData;
         utils: FnUtils;
         logger: HookLogger;
     },
-) => WebhookAction;
-export const zWebhookDispatchFn = fnCarrier<WebhookDispatchFn>(
-    "a webhooks dispatch fn",
+) => WebhookRoute;
+export const zWebhookRouteFn = fnCarrier<WebhookRouteFn>(
+    "a webhooks route fn",
 );
 
 // ---------------------------------------------------------------------------

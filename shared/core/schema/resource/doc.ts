@@ -32,8 +32,7 @@ export type ReconcileUsageDoc = z.infer<typeof zReconcileUsageDoc>;
 
 export const zResourceWebhookDoc = z.strictObject({
     verify: zWebhookVerify,
-    correlate: zFnRef,
-    dispatch: zFnRef,
+    route: zFnRef,
     subscribe: zFnRef,
     unsubscribe: zFnRef.optional(),
 });
@@ -99,7 +98,7 @@ export function resourceFnKeysOf(doc: ResourceDoc): string[] {
         keys.push(view.read.$fn.key);
     }
     for (const hook of Object.values(doc.webhooks ?? {})) {
-        keys.push(hook.correlate.$fn.key, hook.dispatch.$fn.key);
+        keys.push(hook.route.$fn.key);
         keys.push(hook.subscribe.$fn.key);
         if (hook.unsubscribe) keys.push(hook.unsubscribe.$fn.key);
     }

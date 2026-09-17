@@ -137,104 +137,91 @@ export default defineProvider({
         fromError: stripSaperlyInternalKeys,
     },
     webhooks: {
-        account: {
+        /**
+         * The ONE Saperly delivery stream (scope positional — a provider
+         * hook IS the account stream). Verification is the declarative
+         * descriptor (HOST-executed over the EXACT raw bytes):
+         * HMAC-SHA256 of `${timestamp}.${rawBody}`, signature in
+         * x-saperly-signature, unix-seconds timestamp in
+         * x-saperly-timestamp, ±300 s replay window.
+         */
+        "number-events": {
+            verify: {
+                scheme: "hmac-sha256",
+                signatureHeader: "x-saperly-signature",
+                timestampHeader: "x-saperly-timestamp",
+                payload: "${timestamp}.${rawBody}",
+                toleranceMs: 300_000,
+            },
             /**
-             * The ONE Saperly delivery stream. Verification is the
-             * declarative descriptor (HOST-executed over the EXACT raw
-             * bytes): HMAC-SHA256 of `${timestamp}.${rawBody}`, signature
-             * in x-saperly-signature, unix-seconds timestamp in
-             * x-saperly-timestamp, ±300 s replay window.
+             * ONE verdict per delivery (design D44) — who + what in a
+             * single read of the envelope `{deliveryId, eventType,
+             * payload:{...}}` (confirmed live, prod 2026-07-14).
+             *
+             * WHO:
+             *   - payload.numberId → the owning RESOURCE
+             *     (message.received carries it);
+             *   - call.received carries NO numberId — the CALLED
+             *     number's E.164 (`payload.to`, inbound ⇒ always ours)
+             *     resolves via the host's alias pointer;
+             *   - remaining call.* events carry only callId → the LIVE
+             *     RUN (externalRunId = the raw callId, VERBATIM what
+             *     place-calls/inbound-calls store);
+             *   - nothing readable → unhandled (expected traffic on an
+             *     account stream, never an alarm).
+             *
+             * WHAT — the v1 dispatch table, verbatim policy:
+             *   - message.received → RUN inbound-messages (bill-only:
+             *     the message ALREADY arrived — blocking cannot
+             *     un-receive it, only un-bill it); runKey = the
+             *     messageId so duplicate deliveries converge.
+             *   - call.received → RUN inbound-calls (runKey callId;
+             *     admit-overdraft: the call is ALREADY live — the
+             *     accrual loop enforces from there, bounded exposure).
+             *   - call.completed / call.recording.saved → SIGNAL-RUN
+             *     (wake the live run keyed by the callId instead of
+             *     waiting a poll tick).
+             *   - number.* → REFRESH the resource (out-of-band
+             *     compliance/connection changes re-sync the row).
+             *   - message.sent / message.finalized → IGNORE (outbound
+             *     SMS bills at send time; delivery receipts untracked —
+             *     stated policy).
              */
-            "number-events": {
-                verify: {
-                    scheme: "hmac-sha256",
-                    signatureHeader: "x-saperly-signature",
-                    timestampHeader: "x-saperly-timestamp",
-                    payload: "${timestamp}.${rawBody}",
-                    toleranceMs: 300_000,
-                },
-                /**
-                 * WHO (confirmed live, prod 2026-07-14): envelope
-                 * `{deliveryId, eventType, payload:{...}}`.
-                 *   - payload.numberId → the owning RESOURCE
-                 *     (message.received carries it);
-                 *   - call.received carries NO numberId — the CALLED
-                 *     number's E.164 (`payload.to`, inbound ⇒ always
-                 *     ours) resolves via the host's alias pointer;
-                 *   - remaining call.* events carry only callId → the
-                 *     LIVE RUN (externalRunId = the raw callId,
-                 *     VERBATIM what place-calls/inbound-calls store);
-                 *   - nothing readable → unhandled (expected traffic on
-                 *     an account stream, never an alarm).
-                 */
-                correlate: ({ data, utils }) => {
-                    const $ = utils.json;
-                    const body = data.delivery.body;
-                    const event = $.optionalStr(body, "$.eventType") ??
-                        data.delivery.headers["x-saperly-event"] ??
-                        "unknown";
-                    const numberId =
-                        $.optionalStr(body, "$.payload.numberId") ??
-                            $.optionalStr(body, "$.numberId");
-                    if (numberId !== undefined) {
-                        return {
-                            kind: "resource",
-                            target: {
-                                resource: "saperly/phone-number",
-                                externalId: numberId,
-                            },
-                        };
+            route: ({ data, utils }) => {
+                const $ = utils.json;
+                const body = data.delivery.body;
+                const event = $.optionalStr(body, "$.eventType") ??
+                    data.delivery.headers["x-saperly-event"] ??
+                    "unknown";
+                const read = (key: string) =>
+                    $.optionalStr(body, "$.payload." + key) ??
+                        $.optionalStr(body, "$." + key);
+                const readNum = (key: string) =>
+                    $.optionalNum(body, "$.payload." + key) ??
+                        $.optionalNum(body, "$." + key);
+                const numberId = read("numberId");
+                const callId = read("callId") ?? read("id");
+                // WHO — decided once, shared by every WHAT arm below
+                const who = numberId !== undefined
+                    ? {
+                        kind: "resource" as const,
+                        target: {
+                            resource: "saperly/phone-number",
+                            externalId: numberId,
+                        },
                     }
-                    if (event === "call.received") {
-                        const to = $.optionalStr(body, "$.payload.to") ??
-                            $.optionalStr(body, "$.to");
-                        if (to !== undefined) {
-                            return { kind: "alias", e164: to };
-                        }
-                    }
-                    const callId = $.optionalStr(body, "$.payload.callId") ??
-                        $.optionalStr(body, "$.callId") ??
-                        $.optionalStr(body, "$.payload.id");
-                    if (callId !== undefined) {
-                        return { kind: "run", externalRunId: callId };
-                    }
-                    return { kind: "unhandled", event };
-                },
-                /**
-                 * WHAT — the v1 dispatch table, verbatim policy:
-                 *   - message.received → RUN inbound-messages
-                 *     (bill-only: the message ALREADY arrived — blocking
-                 *     cannot un-receive it, only un-bill it); runKey =
-                 *     the messageId so duplicate deliveries converge.
-                 *   - call.received → RUN inbound-calls (runKey callId;
-                 *     admit-overdraft: the call is ALREADY live — the
-                 *     accrual loop enforces from there, bounded
-                 *     exposure).
-                 *   - call.completed / call.recording.saved →
-                 *     SIGNAL-RUN (wake the live run keyed by the callId
-                 *     instead of waiting a poll tick).
-                 *   - number.* → REFRESH the resource (out-of-band
-                 *     compliance/connection changes re-sync the row).
-                 *   - message.sent / message.finalized → IGNORE
-                 *     (outbound SMS bills at send time; delivery
-                 *     receipts untracked — stated policy).
-                 */
-                dispatch: ({ data, utils }) => {
-                    const $ = utils.json;
-                    const body = data.delivery.body;
-                    const event = $.optionalStr(body, "$.eventType") ??
-                        data.delivery.headers["x-saperly-event"] ??
-                        "unknown";
-                    const read = (key: string) =>
-                        $.optionalStr(body, "$.payload." + key) ??
-                            $.optionalStr(body, "$." + key);
-                    const readNum = (key: string) =>
-                        $.optionalNum(body, "$.payload." + key) ??
-                            $.optionalNum(body, "$." + key);
-                    if (event === "message.received") {
-                        const messageId = read("messageId") ?? read("id");
-                        const segments = readNum("segments");
-                        return {
+                    : event === "call.received" &&
+                            read("to") !== undefined
+                    ? { kind: "alias" as const, e164: read("to")! }
+                    : callId !== undefined
+                    ? { kind: "run" as const, externalRunId: callId }
+                    : { kind: "unhandled" as const, event };
+                if (event === "message.received") {
+                    const messageId = read("messageId") ?? read("id");
+                    const segments = readNum("segments");
+                    return {
+                        who,
+                        what: {
                             action: "run",
                             endpoint: "saperly#inbound-messages",
                             input: {
@@ -242,8 +229,8 @@ export default defineProvider({
                                     ...(messageId !== undefined
                                         ? { messageId }
                                         : {}),
-                                    ...(read("numberId") !== undefined
-                                        ? { numberId: read("numberId")! }
+                                    ...(numberId !== undefined
+                                        ? { numberId }
                                         : {}),
                                     ...(read("from") !== undefined
                                         ? { from: read("from")! }
@@ -266,21 +253,23 @@ export default defineProvider({
                                 ? { runKey: "sms:" + messageId }
                                 : {}),
                             controlPolicy: "bill-only",
-                        };
+                        },
+                    };
+                }
+                if (event === "call.received") {
+                    if (callId === undefined) {
+                        return { who, what: { action: "ignore" } };
                     }
-                    const callId = read("callId") ?? read("id");
-                    if (event === "call.received") {
-                        if (callId === undefined) {
-                            return { action: "ignore" };
-                        }
-                        return {
+                    return {
+                        who,
+                        what: {
                             action: "run",
                             endpoint: "saperly#inbound-calls",
                             input: {
                                 body: {
                                     callId,
-                                    ...(read("numberId") !== undefined
-                                        ? { numberId: read("numberId")! }
+                                    ...(numberId !== undefined
+                                        ? { numberId }
                                         : {}),
                                     ...(read("from") !== undefined
                                         ? { from: read("from")! }
@@ -295,32 +284,38 @@ export default defineProvider({
                             },
                             runKey: callId,
                             controlPolicy: "admit-overdraft",
-                        };
+                        },
+                    };
+                }
+                if (
+                    event === "call.completed" ||
+                    event === "call.recording.saved"
+                ) {
+                    if (callId === undefined) {
+                        return { who, what: { action: "ignore" } };
                     }
-                    if (
-                        event === "call.completed" ||
-                        event === "call.recording.saved"
-                    ) {
-                        if (callId === undefined) {
-                            return { action: "ignore" };
-                        }
-                        return { action: "signal-run", runKey: callId };
+                    return {
+                        who,
+                        what: { action: "signal-run", runKey: callId },
+                    };
+                }
+                if (event.startsWith("number.")) {
+                    const target = numberId ?? read("id");
+                    if (target === undefined) {
+                        return { who, what: { action: "ignore" } };
                     }
-                    if (event.startsWith("number.")) {
-                        const numberId = read("numberId") ?? read("id");
-                        if (numberId === undefined) {
-                            return { action: "ignore" };
-                        }
-                        return {
+                    return {
+                        who,
+                        what: {
                             action: "refresh",
                             target: {
                                 resource: "saperly/phone-number",
-                                externalId: numberId,
+                                externalId: target,
                             },
-                        };
-                    }
-                    return { action: "ignore" };
-                },
+                        },
+                    };
+                }
+                return { who, what: { action: "ignore" } };
             },
         },
     },

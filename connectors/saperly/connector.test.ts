@@ -495,19 +495,19 @@ Deno.test("saperly list-messages: gated declarative filter relay", async () => {
 // webhooks — the pure fns off the provider def
 // ---------------------------------------------------------------------------
 
-const hook = provider.webhooks!.account["number-events"];
+const hook = provider.webhooks!["number-events"];
 const delivery = (body: Json, headers: Record<string, string> = {}) => ({
     data: { delivery: { headers, body } },
     utils: fnUtils,
     logger: NOOP_LOGGER,
 });
 
-Deno.test("saperly webhooks: correlate — resource, alias, run, unhandled", () => {
+Deno.test("saperly webhooks: route WHO — resource, alias, run, unhandled", () => {
     assertEquals(
-        hook.correlate(delivery({
+        hook.route(delivery({
             eventType: "message.received",
             payload: { numberId: "num-1", messageId: "msg-1" },
-        })),
+        })).who,
         {
             kind: "resource",
             target: {
@@ -517,27 +517,31 @@ Deno.test("saperly webhooks: correlate — resource, alias, run, unhandled", () 
         },
     );
     assertEquals(
-        hook.correlate(delivery({
+        hook.route(delivery({
             eventType: "call.received",
             payload: { callId: "call-1", to: "+14155559999" },
-        })),
+        })).who,
         { kind: "alias", e164: "+14155559999" },
     );
     assertEquals(
-        hook.correlate(delivery({
+        hook.route(delivery({
             eventType: "call.completed",
             payload: { callId: "call-1" },
-        })),
+        })).who,
         { kind: "run", externalRunId: "call-1" },
     );
+    // nothing readable: who unhandled, what ignore — ONE verdict
     assertEquals(
-        hook.correlate(delivery({ eventType: "billing.rotated" })),
-        { kind: "unhandled", event: "billing.rotated" },
+        hook.route(delivery({ eventType: "billing.rotated" })),
+        {
+            who: { kind: "unhandled", event: "billing.rotated" },
+            what: { action: "ignore" },
+        },
     );
 });
 
-Deno.test("saperly webhooks: dispatch — the v1 action table", () => {
-    const inbound = hook.dispatch(delivery({
+Deno.test("saperly webhooks: route WHAT — the v1 action table", () => {
+    const inbound = hook.route(delivery({
         eventType: "message.received",
         payload: {
             messageId: "msg-1",
@@ -547,7 +551,7 @@ Deno.test("saperly webhooks: dispatch — the v1 action table", () => {
             body: "hi",
             segments: 1,
         },
-    }));
+    })).what;
     assertEquals(inbound, {
         action: "run",
         endpoint: "saperly#inbound-messages",
@@ -564,26 +568,26 @@ Deno.test("saperly webhooks: dispatch — the v1 action table", () => {
         runKey: "sms:msg-1",
         controlPolicy: "bill-only",
     });
-    const call = hook.dispatch(delivery({
+    const call = hook.route(delivery({
         eventType: "call.received",
         payload: { callId: "call-1", to: "+14155559999" },
-    }));
+    })).what;
     assert(call.action === "run");
     assertEquals(call.endpoint, "saperly#inbound-calls");
     assertEquals(call.runKey, "call-1");
     assertEquals(call.controlPolicy, "admit-overdraft");
     assertEquals(
-        hook.dispatch(delivery({
+        hook.route(delivery({
             eventType: "call.completed",
             payload: { callId: "call-1" },
-        })),
+        })).what,
         { action: "signal-run", runKey: "call-1" },
     );
     assertEquals(
-        hook.dispatch(delivery({
+        hook.route(delivery({
             eventType: "number.compliance.updated",
             payload: { numberId: "num-1" },
-        })),
+        })).what,
         {
             action: "refresh",
             target: {
@@ -592,8 +596,9 @@ Deno.test("saperly webhooks: dispatch — the v1 action table", () => {
             },
         },
     );
+    // stated policy: outbound receipts map (who: resource) but IGNORE
     assertEquals(
-        hook.dispatch(delivery({ eventType: "message.sent" })),
+        hook.route(delivery({ eventType: "message.sent" })).what,
         { action: "ignore" },
     );
 });

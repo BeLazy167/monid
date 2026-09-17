@@ -1,25 +1,22 @@
 import { z } from "zod";
 import {
     zResourceWebhookSubscribeFn,
-    zWebhookCorrelateFn,
-    zWebhookDispatchFn,
+    zWebhookRouteFn,
     zWebhookSubscribeFn,
     zWebhookVerify,
 } from "../hooks/webhooks.ts";
 
 /**
- * WEBHOOK SECTIONS (design D36) — the def-side declarations. Two scopes,
- * mirroring the v1 binding model's two path shapes:
- *   - ACCOUNT scope (provider def `webhooks.account`): one vendor-account
- *     stream fanning into per-workspace meaning via `correlate`
- *     (`/v1/providers/:provider/account/{slug}`).
- *   - RESOURCE scope (resource def `webhooks`): per-resource
- *     registrations (`/v1/providers/:provider/resource/{resourceId}/
- *     {slug}`), where `subscribe` is REQUIRED — a per-resource stream
- *     without upstream registration cannot exist.
+ * WEBHOOK SECTIONS (design D36/D44) — the def-side declarations. SCOPE
+ * IS POSITIONAL: a hook on the PROVIDER def is the vendor-account stream
+ * (`/v1/providers/:provider/account/{slug}`), a hook on a RESOURCE def
+ * is a per-resource registration (`/v1/providers/:provider/resource/
+ * {resourceId}/{slug}`, `subscribe` REQUIRED — a per-resource stream
+ * without upstream registration cannot exist). No `account:` wrapper —
+ * where the hook LIVES already says what it is.
  * The HOST owns the ingress route, raw-byte signature verification (the
- * declarative `verify` descriptor), the routing rows, and executing
- * dispatch actions; docs own the vocabulary.
+ * declarative `verify` descriptor), the routing rows, and executing the
+ * route verdicts; docs own the vocabulary.
  */
 
 export const zWebhookSlug = z.string().regex(
@@ -28,29 +25,25 @@ export const zWebhookSlug = z.string().regex(
 );
 export type WebhookSlug = z.infer<typeof zWebhookSlug>;
 
-/** One account-scope hook. No `subscribe` = MANUAL registration: the host
- *  boot-reconcile ensures the routing row and LOGS the callback URL for
- *  the operator to paste into the vendor dashboard (saperly). */
-export const zAccountWebhook = z.strictObject({
+/** One provider-scope hook. No `subscribe` = MANUAL registration: the
+ *  host boot-reconcile ensures the routing row and LOGS the callback URL
+ *  for the operator to paste into the vendor dashboard (saperly). */
+export const zProviderWebhook = z.strictObject({
     verify: zWebhookVerify,
-    correlate: zWebhookCorrelateFn,
-    dispatch: zWebhookDispatchFn,
+    route: zWebhookRouteFn,
     subscribe: zWebhookSubscribeFn.optional(),
     unsubscribe: zWebhookSubscribeFn.optional(),
 });
-export type AccountWebhook = z.infer<typeof zAccountWebhook>;
+export type ProviderWebhook = z.infer<typeof zProviderWebhook>;
 
-export const zWebhooksSection = z.strictObject({
-    account: z.record(zWebhookSlug, zAccountWebhook),
-});
+export const zWebhooksSection = z.record(zWebhookSlug, zProviderWebhook);
 export type WebhooksSection = z.infer<typeof zWebhooksSection>;
 
 /** One resource-scope hook — `subscribe` REQUIRED (idempotent: keys
  *  derive from resource identity + a URL hash, re-asserts converge). */
 export const zResourceWebhook = z.strictObject({
     verify: zWebhookVerify,
-    correlate: zWebhookCorrelateFn,
-    dispatch: zWebhookDispatchFn,
+    route: zWebhookRouteFn,
     subscribe: zResourceWebhookSubscribeFn,
     unsubscribe: zResourceWebhookSubscribeFn.optional(),
 });

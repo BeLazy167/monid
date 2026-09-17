@@ -44,7 +44,7 @@ export function sealResourceUnit(
 }
 
 /** A provider doc + its webhook fn entries — what the host ingress loads
- *  to verify/correlate/dispatch account-scope deliveries. */
+ *  to verify + route provider-scope deliveries. */
 export const zProviderSealedUnit = z.strictObject({
     doc: zProviderDoc,
     fns: z.record(zFnId, zFnEntry),

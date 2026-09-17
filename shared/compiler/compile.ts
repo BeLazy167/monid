@@ -1049,26 +1049,21 @@ export async function compileBundle(
             }
         }
 
-        // ---- provider webhooks (design D36): account-scope hooks ----------
+        // ---- provider webhooks (design D36/D44): scope is positional —
+        // a hook on the provider def IS the account stream
         let webhooksDoc: Record<string, Json> | undefined;
         if (provider.webhooks) {
-            const account: Record<string, Json> = {};
+            webhooksDoc = {};
             for (
-                const [slug, hook] of Object.entries(
-                    provider.webhooks.account,
-                ).sort(([a], [b]) => a.localeCompare(b))
+                const [slug, hook] of Object.entries(provider.webhooks)
+                    .sort(([a], [b]) => a.localeCompare(b))
             ) {
-                const label = `${providerFile}#webhooks.account.${slug}`;
-                account[slug] = pruneUndefined({
+                const label = `${providerFile}#webhooks.${slug}`;
+                webhooksDoc[slug] = pruneUndefined({
                     verify: hook.verify as unknown as Json,
-                    correlate: await interner.intern(
-                        hook.correlate,
-                        `${label}.correlate`,
-                        SC.resourcesSince,
-                    ) as unknown as Json,
-                    dispatch: await interner.intern(
-                        hook.dispatch,
-                        `${label}.dispatch`,
+                    route: await interner.intern(
+                        hook.route,
+                        `${label}.route`,
                         SC.resourcesSince,
                     ) as unknown as Json,
                     subscribe: hook.subscribe
@@ -1087,7 +1082,6 @@ export async function compileBundle(
                         : undefined,
                 }) as Record<string, Json>;
             }
-            webhooksDoc = { account };
         }
 
         // ---- ProviderDoc: identity + display (+ webhooks, the one
@@ -1325,14 +1319,9 @@ async function compileResource(args: {
         const label = `${resourceFile}#webhooks.${slug}`;
         webhooks[slug] = pruneUndefined({
             verify: hook.verify as unknown as Json,
-            correlate: await interner.intern(
-                hook.correlate,
-                `${label}.correlate`,
-                SC.resourcesSince,
-            ) as unknown as Json,
-            dispatch: await interner.intern(
-                hook.dispatch,
-                `${label}.dispatch`,
+            route: await interner.intern(
+                hook.route,
+                `${label}.route`,
                 SC.resourcesSince,
             ) as unknown as Json,
             subscribe: await interner.intern(
