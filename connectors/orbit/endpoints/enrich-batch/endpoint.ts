@@ -35,12 +35,15 @@ export default defineEndpoint({
             "asked for. Takes Orbit profile ids or public slugs, " +
             "which `orbit#v3/search` returns; duplicates are normalized " +
             "before work starts. Reach for this when an agent holds a list " +
-            "of people — a guest list, a roster, an account team — and " +
-            "wants depth on all of them at once. The result carries one " +
+            "of people — a guest list, a roster, an account team, a " +
+            "shortlist of candidates — and wants depth on all of them at " +
+            "once. The result carries one " +
             "child per profile, each with its own status, depth and " +
             "profile. Profiles already at the depth you asked for come back " +
             "as they stand and cost nothing; the rest are 5 credits each " +
-            "for `partial` and 10 each for `full` and `regenerate`.",
+            "for `partial` and 10 each for `full` and `regenerate`. For a " +
+            "list longer than 20, or for people Orbit has yet to identify, " +
+            "use `orbit#v3/search/bulk`.",
         docsUrl: "https://docs.orbitsearch.com/api/enrich-batch",
         categories: ["people-enrichment"],
     },

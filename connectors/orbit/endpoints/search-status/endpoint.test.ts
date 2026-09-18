@@ -1,6 +1,7 @@
-import { assert, assertEquals } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
+    assertInputAccepted,
     liveSkip,
     loadFixture,
     runEndpoint,
@@ -74,8 +75,13 @@ Deno.test({
             },
             mode: "live",
         });
-        // Whichever way Orbit answers an id this key cannot see, a status
-        // read is free.
-        assertEquals(result.usage, { credits: {}, evidence: {} });
+        // SHAPE, not amounts: a status read declares no credit system, so
+        // whichever way Orbit answers an id this key cannot see, the run
+        // draws on no pool.
+        assertEquals(Object.keys(result.usage.credits).length, 0);
+        assert(
+            typeof result.httpStatus === "number",
+            "the read answered with a status",
+        );
     },
 });

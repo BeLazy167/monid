@@ -1,6 +1,7 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
+    assertInputAccepted,
     estimateEndpoint,
     loadFixture,
     runEndpoint,
@@ -88,5 +89,34 @@ Deno.test("orbit#v3/enrich: a transient FINAL read re-opens the child instead of
     assertEquals(result.usage, {
         credits: { default: 5 },
         evidence: { partial_profile: 1 },
+    });
+});
+
+Deno.test("orbit#v3/enrich: the gate rejects a 21st profile, and passes 20", async () => {
+    const unit = await testSealedUnit("orbit#v3/enrich");
+    const fixture = await loadFixture(`${chains}synthetic-enrich-batch.json`);
+    const ids = (count: number) =>
+        Array.from({ length: count }, (_unused, index) => `PROF_${index}`);
+
+    // NEAR-VALID and bad: one past the vendor's own cap.
+    await assertRejects(
+        () =>
+            runEndpoint({
+                unit,
+                input: { body: { profile_ids: ids(21), operation: "partial" } },
+                mode: "replay",
+                fixture,
+            }),
+        Error,
+        "INVALID_INPUT",
+    );
+
+    // The near-twin at exactly the cap must pass, so the gate is not too
+    // narrow either.
+    await assertInputAccepted({
+        unit,
+        input: { body: { profile_ids: ids(20), operation: "partial" } },
+        mode: "replay",
+        fixture,
     });
 });

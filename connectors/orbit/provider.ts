@@ -84,20 +84,25 @@ export default defineProvider({
     meta: {
         displayName: "Orbit",
         summary:
-            "The most in-depth, source-backed context about a person, for deep personalization and research.",
+            "The most in-depth, source-backed context about a person — for personalization, sales, research and diligence.",
         description: "Orbit gives an agent the deepest available context " +
             "about a PERSON — who they are, what they have done, what they " +
             "care about, and the sources behind every claim. Find someone " +
             "from a plain-English description, a name, an email, a phone " +
             "number, an address, a handle, or a profile URL; then read a " +
-            "profile that carries identity, contact and work facts plus " +
+            "profile carrying identity, contact and work facts plus " +
             "generated sections on their background, interests and recent " +
-            "activity, each attributed to the source it came from. Use it " +
-            "to choose a gift a friend will actually like, to learn about " +
-            "someone before meeting them, to brief yourself on a client, or " +
-            "to research a person properly. Depth is the caller's choice: " +
-            "`partial` is a useful profile in seconds, `full` is the " +
-            "deepest profile Orbit can build.",
+            "activity, each attributed to the source it came from. Reach " +
+            "for Orbit whenever a PERSON is the subject: someone the user " +
+            "just mentioned and you know nothing about, a prospect or " +
+            "account contact before outreach, a candidate or counterparty " +
+            "under diligence, the people behind a company you are " +
+            "researching, a friend you are choosing a gift for, or anyone " +
+            "the user is about to meet. One person or a whole table of " +
+            "them — a CSV, a CRM export or a prospect list runs as one bulk " +
+            "job of up to 5,000 rows and answers on your own row ids. " +
+            "Depth is the caller's choice: `partial` is a useful profile in " +
+            "seconds, `full` is the deepest profile Orbit can build.",
         homepageUrl: "https://orbitsearch.com",
         docsUrl: "https://docs.orbitsearch.com",
         categories: ["people-enrichment"],
