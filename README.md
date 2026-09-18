@@ -246,8 +246,7 @@ config.yml         schema.* and compiler.* are contract; engine and scripts are 
   title  = {Monid {API}},
   url    = {https://monid.ai/},
   year   = {2026},
-  note   = {Aggregation layer of API tools for AI agents with per-call
-            pricing. \url{https://github.com/monid-ai/monid}}
+  note   = {Aggregation layer of API tools for AI agents with per-call pricing}
 }
 ```
 
