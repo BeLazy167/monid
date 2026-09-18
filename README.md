@@ -242,12 +242,12 @@ config.yml         schema.* and compiler.* are contract; engine and scripts are 
 
 ```bibtex
 @misc{monid2026,
-  author       = {{Monid}},
-  title        = {Monid {API}},
-  howpublished = {\url{https://monid.ai/}},
-  year         = {2026},
-  note         = {Aggregation layer of API tools for AI agents with per-call
-                  pricing. \url{https://github.com/monid-ai/monid}}
+  author = {{Monid}},
+  title  = {Monid {API}},
+  url    = {https://monid.ai/},
+  year   = {2026},
+  note   = {Aggregation layer of API tools for AI agents with per-call
+            pricing. \url{https://github.com/monid-ai/monid}}
 }
 ```
 
