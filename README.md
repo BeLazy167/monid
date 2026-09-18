@@ -249,6 +249,18 @@ config.yml         schema.* and compiler.* are contract; engine and scripts are 
 - [AGENT.md](./AGENT.md) is the brief to hand a coding agent you point at this
   repo.
 
+## Citation
+
+```bibtex
+@misc{monid2026,
+  author = {{Monid}},
+  title  = {Monid {API}},
+  url    = {https://monid.ai/},
+  year   = {2026},
+  note   = {Aggregation layer of API tools for AI agents with per-call pricing}
+}
+```
+
 ## License
 
 MIT. See [LICENSE](./LICENSE).
