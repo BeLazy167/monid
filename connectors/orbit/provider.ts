@@ -7,20 +7,24 @@ import { defineProvider, presets } from "@shared/core";
  *
  * Three shapes live behind that one host:
  *
- *   - SYNC reads — a profile read, a status poll, a price quote. One request,
- *     one answer.
+ *   - SYNC reads — a profile read and two status polls. One request, one
+ *     answer.
  *   - ASYNC WORK — search and enrich. The submit answers `202` with a
  *     snapshot carrying the id and `status: "running"`; the caller polls the
  *     matching status route until the status is terminal. Four endpoints
  *     carry a lifecycle so ONE monid run returns finished work; the status
  *     routes stay exposed for callers who would rather drive the poll
  *     themselves or resume a run started elsewhere.
- *   - BULK — up to 5,000 searches as one durable job, read back by page.
  *
  * THE LIFECYCLE IS NOT ON THE PROVIDER. A provider-level `start` replaces
- * declarative execution on the SYNC endpoints too, and eight of this
- * connector's twelve endpoints are plain requests. Each async endpoint
- * authors its own phases.
+ * declarative execution on the SYNC endpoints too, and half of this
+ * connector's endpoints are plain requests. Each async endpoint authors its
+ * own phases.
+ *
+ * SCOPES: `search:read` and `profile:read`, the same pair Orbit's own hosted
+ * MCP server publishes. The connector reaches no surface that needs
+ * `watchers:write` or `webhooks:write`, so the provider key never has to
+ * carry them.
  *
  * BILLING — Orbit publishes its rate card at `GET /v2/developer/pricing`,
  * unauthenticated, and the lines below are pinned from version `2026-09-10`:
@@ -37,17 +41,21 @@ import { defineProvider, presets } from "@shared/core";
  * profile Orbit had to BUILD draws 5 or 10 on top. An enrich that finds the
  * profile already at the requested depth is a no-op and settles at zero.
  *
- * Search and enrich responses carry NO meter, so those endpoints ship without
- * a `usage.consolidate` (design D27 — the hook is optional) and the derived
- * fold settles them. TWO endpoints DO report a vendor claim and declare one:
- * a bulk job reports `billing.consumed_credits`, and a population search
- * reports `population.credits_quoted`.
+ * NO endpoint in this connector reports a vendor meter, so none declares a
+ * `usage.consolidate` (design D27 — the hook is optional) and the derived
+ * fold settles every run.
  *
  * LINES NOT MODELED, and why (the D29 completeness rule):
  *   - `watcher_run` (1) and `watcher_update` (5) accrue on Orbit's own
  *     schedule AFTER the call that created the watcher returns, so a monid
  *     run can never settle them. The watcher surface is held back until the
  *     two platforms agree how a recurring charge settles; see the proposal.
+ *   - A POPULATION search is priced as one number and reserved when it
+ *     starts — and Orbit then "settles them as the work completes, and
+ *     releases what it did not use" (docs.orbitsearch.com/concepts/credits).
+ *     The reserve is a CEILING, the public contract carries no settled
+ *     figure, and billing a ceiling would overcharge every population that
+ *     under-runs. Both population routes are held back with the watchers.
  *   - `face_search` (100) rides an identity signal that is absent from the
  *     published request schema.
  *   - The company lines (`company_search`, `company_profile`,

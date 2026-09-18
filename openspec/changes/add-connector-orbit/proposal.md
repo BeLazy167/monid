@@ -25,12 +25,12 @@ exists only while a run is in flight.
 
 ## What Changes
 
-- **connectors/orbit** — 8 endpoints against `https://api.orbitsearch.com`,
-  bearer auth (`sk_orb_` keys), one credit pool, a provider-level
+- **connectors/orbit** — 6 endpoints against `https://api.orbitsearch.com`,
+  bearer auth (`sk_orb_` keys) needing only the `search:read` and
+  `profile:read` scopes, one credit pool, a provider-level
   `output.fromError`, and no provider lifecycle.
-  - 4 sync: profile read, search status, enrichment status, population quote.
+  - 3 sync: profile read, search status, enrichment status.
   - 3 async: search, enrich, batch enrich — each carrying its own lifecycle.
-  - 1 pass-through submit: population search.
 - **The poll is the meter (search).** Orbit charges 5 or 10 credits for a
   profile it BUILT and nothing for one it already held, and the two are
   indistinguishable in the terminal snapshot — both read `ready` at the depth
@@ -54,15 +54,11 @@ exists only while a run is in flight.
   The lifecycle polls only the children still running, then reads every child
   once more so the envelope carries one current snapshot per profile. Bounded
   by the vendor's own cap of 20, and child reads are free.
-- **Two claims that DO exist are honored.** A population search reserves its
-  whole cost when it starts and reports it as `population.credits_quoted`;
-  that figure settles the run. Its free companion quote returns the same
-  number before anything starts.
 - **Estimates are ceilings, and they are the point.** `limit: 100` at full
   depth authorizes up to 1,010 credits while a typical cached search settles
   at 1. An agent that reads `estimate` before committing sees the difference;
   one that does not, finds out afterwards.
-- 13 synthetic fixture chains and 21 replay tests, covering both zero-settle
+- 12 synthetic fixture chains and 18 replay tests, covering both zero-settle
   regressions (the cached search, the no-op enrich) explicitly.
 
 ## Capabilities
@@ -79,6 +75,18 @@ exists only while a run is in flight.
   call is free while it commits an open-ended draw is the one thing a billing
   model must not do. It arrives when the two platforms have agreed how a
   recurring charge settles.
+- **Population search is held back** (`/v3/search/populations` and its
+  quote), and this one is worth stating precisely because the endpoint LOOKS
+  settleable. A population is priced as one number and reserved when the
+  search starts — but Orbit then "settles them as the work completes, and
+  releases what it did not use when the search ends"
+  (`docs.orbitsearch.com/concepts/credits`). `credits_quoted` is therefore a
+  CEILING, not a charge, and the public contract carries no settled figure
+  anywhere. Billing the ceiling would overcharge every population that
+  under-runs, and billing zero would hand out the work free. The free quote
+  goes with it: a price an agent cannot act on is a dead end in a catalog.
+  The pair arrives together once a snapshot reports what the search actually
+  settled.
 - **Bulk search is held back** (`/v3/search/bulk` and its three reads), for
   the same reason in a different shape: up to 5,000 searches as one durable
   job, consuming credits across hours. It reports `billing.consumed_credits`
@@ -96,6 +104,11 @@ exists only while a run is in flight.
 - No new category leaf: `people-enrichment` already exists.
 - No dollar conversion in the doc. Orbit's packages are a flat $0.01/credit at
   every tier, and the conversion stays the broker card's job.
+
+The six that remain are exactly the endpoints that settle inside their own
+run — and, separately, exactly the request/response surface Orbit's own agent
+skill (`docs.orbitsearch.com/skill.md`) and hosted MCP server publish for this
+job.
 
 ## Impact
 

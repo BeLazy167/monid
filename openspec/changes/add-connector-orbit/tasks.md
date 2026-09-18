@@ -24,10 +24,8 @@
       `{status, error: {code, message}}`; no lifecycle, no consolidate
 - [x] 2.2 `schema/person-query.ts`: the `StructuredIntent` / `IdentitySignals`
       mirrors plus the shape shared by search and any future bulk item
-- [x] 2.3 `schema/population.ts`: the `PopulationSubject` mirror and the
-      shape shared by the population search and its quote
 
-## 3. Endpoints (8)
+## 3. Endpoints (6)
 
 - [x] 3.1 `search` — mirror + vendor defaults at the binding + lifecycle whose
       poll accumulates the build signal + 4-line composite
@@ -38,17 +36,14 @@
       signal + 2-line composite
 - [x] 3.5 `enrich-status` — path mirror, FREE
 - [x] 3.6 `enrich-batch` — mirror + fan-out lifecycle over child request ids
-- [x] 3.7 `population-search` — mirror, pass-through submit, settles on
-      `population.credits_quoted`
-- [x] 3.8 `population-quote` — mirror, FREE
 
 ## 4. Fixtures + tests
 
-- [x] 4.1 13 provider-level chains (strategy v2), `synthetic-` prefixed until
+- [x] 4.1 12 provider-level chains (strategy v2), `synthetic-` prefixed until
       recorded: search async / indexed / discovery / failed / transient,
-      enrich built / no-op / provider-error, batch, population search + quote,
-      profile read, search status read, shared provider error
-- [x] 4.2 21 replay tests, including the two zero-settle regressions the
+      enrich built / no-op / provider-error, batch, profile read, search
+      status read, shared provider error
+- [x] 4.2 18 replay tests, including the two zero-settle regressions the
       connector exists to get right — a cached search and a no-op enrich
 - [x] 4.3 Estimate spot-checks against the published rate card
 - [ ] 4.4 Record real chains and run `deno task test:live` once the dedicated
@@ -57,8 +52,12 @@
 ## 5. Verification
 
 - [x] 5.1 `deno task fmt` · `lint` · `check` clean
-- [x] 5.2 `deno task test` — 971 passed, 0 failed
+- [x] 5.2 `deno task test` — full suite green
 - [x] 5.3 `deno task version:check` — no contract-surface change
 - [x] 5.4 Double-compile byte-identical
-- [x] 5.5 `deno task catalog endpoints --provider orbit` lists all 8, and
+- [x] 5.5 `deno task catalog endpoints --provider orbit` lists all 6, and
       `catalog inspect` returns the approved copy and schemas
+- [x] 5.6 Reconcile against Orbit's own published surfaces: `concepts/credits`
+      (the settle rules), `skill.md` + `llms.txt` (the agent endpoint set),
+      the hosted MCP server's four tools and the ChatGPT app's tool
+      descriptions (scopes, the `regenerate` warning, quote-then-confirm)

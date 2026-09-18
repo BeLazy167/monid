@@ -35,9 +35,10 @@ export default defineEndpoint({
             "seconds. `full` produces the deepest profile Orbit can build — " +
             "web, social and public-record research pulled together into " +
             "attributed sections on the person's background, interests and " +
-            "recent activity — and takes minutes. `regenerate` rebuilds a " +
-            "fresh full profile from current sources, which is the one to " +
-            "use when the stored profile has gone stale. Takes an Orbit " +
+            "recent activity — and takes minutes. `regenerate` forces " +
+            "fresh work that CAN REPLACE facts already on the profile, so " +
+            "reach for it only when a refresh is what was asked for. Takes " +
+            "an Orbit " +
             "profile id, alias id, or public slug; `orbit#v3/search` finds " +
             "one from a name, an email, a phone number or a description. " +
             "Reach for this when an agent already knows who the person is " +

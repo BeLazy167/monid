@@ -24,7 +24,9 @@ export default defineEndpoint({
             "an alias id, or a public slug — search results and enrichment " +
             "responses all carry one. The response reports " +
             "`generation_level`, which says how deep the stored profile " +
-            "goes; `orbit#v3/enrich/{profile_id}` builds it deeper. This is " +
+            "goes; `orbit#v3/enrich/{profile_id}` builds it deeper. The " +
+            "read returns the profile as stored, and can schedule a " +
+            "refresh behind it when that data is stale. This is " +
             "the endpoint to reach for when an agent already knows WHO the " +
             "person is and wants everything about them. 1 credit.",
         docsUrl: "https://docs.orbitsearch.com/api/profile-read",

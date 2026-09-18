@@ -123,8 +123,8 @@ parent status SHALL be `completed_with_errors` when any child ended other than
   and the output carries both children under `request_id` `BATCH1`
 
 ### Requirement: Reads are free
-`orbit#v3/search/{search_id}`, `orbit#v3/enrich/requests/{request_id}` and
-`orbit#v3/search/populations/quote` SHALL declare `UsageModelKind.FREE`.
+`orbit#v3/search/{search_id}` and `orbit#v3/enrich/requests/{request_id}`
+SHALL declare `UsageModelKind.FREE`.
 Following a long search is a repeated read, and re-reading a snapshot must
 never re-bill the work that produced it.
 
@@ -142,16 +142,3 @@ two defs on one path collide. It SHALL price `PER_CALL` 1 credit.
 - **WHEN** the compiled doc is inspected
 - **THEN** its id is `orbit#v3/profile/{profile_id}` and its request url is
   `https://api.orbitsearch.com/v3/enrich/{profile_id}`
-
-### Requirement: A population search settles on the figure Orbit reserved
-`orbit#v3/search/populations` SHALL be a pass-through submit with no
-lifecycle, because a population fills over a long time and is read through
-`orbit#v3/search/{search_id}`. It SHALL price `PER_UNIT` in `CREDIT` units,
-`evidence` SHALL read `population.credits_quoted`, and `estimate` SHALL price
-the `size` the caller stated at the depth asked for, answering zero when no
-size is stated.
-
-#### Scenario: The reserved figure is the settle
-- **WHEN** the submit answers 202 with `population.credits_quoted` 640
-- **THEN** usage is `{credits: {default: 640}, evidence: {CREDIT: 640}}` and
-  the output carries the `search_id` the caller reads it back by

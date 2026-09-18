@@ -29,8 +29,10 @@ export default defineEndpoint({
         description: "Build up to 20 Orbit profiles with one operation and " +
             "get every finished profile back together. Same depths as the " +
             "single build: `partial` for a useful profile, `full` for the " +
-            "deepest Orbit can build, `regenerate` to rebuild fresh from " +
-            "current sources. Takes Orbit profile ids or public slugs, " +
+            "deepest Orbit can build, and `regenerate` to force fresh " +
+            "work — which can replace facts already on EVERY profile in " +
+            "the list, so reach for it only when a refresh is what was " +
+            "asked for. Takes Orbit profile ids or public slugs, " +
             "which `orbit#v3/search` returns; duplicates are normalized " +
             "before work starts. Reach for this when an agent holds a list " +
             "of people — a guest list, a roster, an account team — and " +
