@@ -25,12 +25,24 @@ exists only while a run is in flight.
 
 ## What Changes
 
-- **connectors/orbit** — 6 endpoints against `https://api.orbitsearch.com`,
+- **connectors/orbit** — 10 endpoints against `https://api.orbitsearch.com`,
   bearer auth (`sk_orb_` keys) needing only the `search:read` and
   `profile:read` scopes, one credit pool, a provider-level
   `output.fromError`, and no provider lifecycle.
-  - 3 sync: profile read, search status, enrichment status.
-  - 3 async: search, enrich, batch enrich — each carrying its own lifecycle.
+  - 6 sync: profile read, search status, enrichment status, and the three
+    free bulk-job readers (status, results, cancel).
+  - 4 async: search, enrich, batch enrich and bulk search — each carrying
+    its own lifecycle.
+- **Bulk search is the CSV path, and the one EXACT bill.** Up to 5,000
+  searches as one job, each row carrying the caller's own `id` which returns
+  on the matching result. It is the only endpoint here whose settle is not a
+  derived lower bound: a job reports `billing.consumed_credits`, its own
+  cumulative charge after Orbit "releases unused credits", so a
+  `usage.consolidate` claim settles it outright. It also has a cancel route,
+  so `lifecycle.stop` cancels undispatched rows when a run hits its budget.
+  `waiting_for_credits` and `needs_attention` are slow rather than finished —
+  Orbit resumes the first itself and retries the second about every five
+  minutes — so both keep the run alive on a backed-off cadence.
 - **The poll is the meter (search).** Orbit charges 5 or 10 credits for a
   profile it BUILT and nothing for one it already held, and the two are
   indistinguishable in the terminal snapshot — both read `ready` at the depth
@@ -87,11 +99,6 @@ exists only while a run is in flight.
   goes with it: a price an agent cannot act on is a dead end in a catalog.
   The pair arrives together once a snapshot reports what the search actually
   settled.
-- **Bulk search is held back** (`/v3/search/bulk` and its three reads), for
-  the same reason in a different shape: up to 5,000 searches as one durable
-  job, consuming credits across hours. It reports `billing.consumed_credits`
-  honestly, so it becomes tractable the moment there is a settled answer for
-  work that outlives a run.
 - **Webhooks are held back** (`/v3/webhooks`). The create response returns a
   plaintext signing secret exactly once, and a completed run is retrievable
   later with its full provider output — so the endpoint is unsafe to expose
@@ -105,10 +112,10 @@ exists only while a run is in flight.
 - No dollar conversion in the doc. Orbit's packages are a flat $0.01/credit at
   every tier, and the conversion stays the broker card's job.
 
-The six that remain are exactly the endpoints that settle inside their own
-run — and, separately, exactly the request/response surface Orbit's own agent
-skill (`docs.orbitsearch.com/skill.md`) and hosted MCP server publish for this
-job.
+What ships is exactly the set that settles inside its own run. A bulk job
+qualifies where a population does not, and the difference is worth stating
+plainly: a population reserves a ceiling and never reports what it settled,
+while a bulk job reports the settled figure itself.
 
 ## Impact
 

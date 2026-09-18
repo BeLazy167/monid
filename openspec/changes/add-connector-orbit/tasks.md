@@ -25,7 +25,7 @@
 - [x] 2.2 `schema/person-query.ts`: the `StructuredIntent` / `IdentitySignals`
       mirrors plus the shape shared by search and any future bulk item
 
-## 3. Endpoints (6)
+## 3. Endpoints (10)
 
 - [x] 3.1 `search` — mirror + vendor defaults at the binding + lifecycle whose
       poll accumulates the build signal + 4-line composite
@@ -87,3 +87,28 @@
 - [x] 6.8 Test matrix completed on the sync endpoints: provider-error,
       schema-gate and `liveSkip("orbit")` live cases; the rate card and its
       version are cited at the estimate assertions
+
+## 7. Bulk search (the CSV path)
+
+- [x] 7.1 `bulk-search` — the `BulkSearchRequest` mirror with Orbit's per-item
+      defaults bound, a lifecycle that follows `links.status`, `stop` wired to
+      the cancel route, and `waiting_for_credits` / `needs_attention` treated
+      as slow rather than finished
+- [x] 7.2 `usage.consolidate` on `billing.consumed_credits` — the only EXACT
+      settle in the connector, and the reason bulk ships where the population
+      routes do not
+- [x] 7.3 Three FREE readers: `bulk-status`, `bulk-results`, `bulk-cancel`,
+      each overriding the claim to empty so a job body's consumed total can
+      never re-bill the job
+- [x] 7.4 Six chains and six tests: the exact settle, the slow statuses, a
+      full queue as data, the estimate ceiling, the row-id gate, and the
+      re-bill regression on each reader
+- [ ] 7.5 Record real chains against a job once the provider key is in place
+
+## 8. Catalog positioning
+
+- [x] 8.1 Provider and endpoint copy name the jobs an agent arrives with —
+      a person the user just mentioned, a prospect before outreach, a
+      candidate or counterparty under diligence, the people behind a company,
+      a CSV or CRM export — with "maximum person context" kept as the spine
+- [x] 8.2 No platform names and nothing about what Orbit already holds
