@@ -143,6 +143,47 @@ export default defineEndpoint({
                     ? link
                     : "/v3/search/" + encodeURIComponent(searchId);
             const status = utils.json.optionalGet(res.body, "$.status");
+            const state = {
+                externalRunId: searchId,
+                data: { built, statusPath },
+            };
+            if (status === "failed") {
+                // A search that fails on the submit reports its reason at
+                // `candidate_discovery_failure`, where the provider's
+                // fromError does not look — so it is lifted into Orbit's own
+                // error envelope here, exactly as the poll does it. Handing
+                // the snapshot back raw would publish the generic fallback
+                // message and strand the real reason in `raw`.
+                const failure = utils.json.optionalGet(
+                    res.body,
+                    "$.candidate_discovery_failure",
+                );
+                const message = utils.json.optionalGet(
+                    failure ?? null,
+                    "$.message",
+                );
+                const code = utils.json.optionalGet(failure ?? null, "$.code");
+                logger.warn("orbit search failed on submit", { searchId });
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: 500,
+                    providerHttpStatus: res.status,
+                    output: {
+                        status: "failed",
+                        error: {
+                            code: typeof code === "string"
+                                ? code
+                                : "search_failed",
+                            message:
+                                typeof message === "string" && message !== ""
+                                    ? message
+                                    : "Orbit search failed",
+                        },
+                        search_id: searchId,
+                    },
+                    state,
+                };
+            }
             if (status !== "running") {
                 // Orbit answered the whole search on the submit — a 200 with
                 // a terminal status, which is what a search over people it
@@ -153,24 +194,12 @@ export default defineEndpoint({
                 });
                 return {
                     kind: "COMPLETED",
-                    httpStatus: status === "failed" ? 500 : res.status,
-                    ...(status === "failed"
-                        ? { providerHttpStatus: res.status }
-                        : {}),
+                    httpStatus: res.status,
                     output: res.body,
-                    state: {
-                        externalRunId: searchId,
-                        data: { built, statusPath },
-                    },
+                    state,
                 };
             }
-            return {
-                kind: "RUNNING",
-                state: {
-                    externalRunId: searchId,
-                    data: { built, statusPath },
-                },
-            };
+            return { kind: "RUNNING", state };
         },
         poll: async ({ data, utils, logger }) => {
             const searchId = data.lifecycle.state.externalRunId;

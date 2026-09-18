@@ -150,3 +150,27 @@ Deno.test({
         assert(pools.length === 0 || pools.join() === "default", pools.join());
     },
 });
+
+Deno.test("orbit#v3/enrich/{profile_id}: a submit-time failure reads like a poll-time one", async () => {
+    const unit = await testSealedUnit("orbit#v3/enrich/{profile_id}");
+    const result = await runEndpoint({
+        unit,
+        input: {
+            pathParams: { profile_id: PROFILE },
+            body: { operation: "full" },
+        },
+        mode: "replay",
+        fixture: await loadFixture(
+            `${chains}synthetic-enrich-failed-on-submit.json`,
+        ),
+    });
+
+    // Same shape as the poll's failure path: the reason at `failure` is
+    // lifted into Orbit's own error envelope so one mapper reads both.
+    assertEquals(result.httpStatus, 500);
+    assertEquals(result.providerHttpStatus, 200);
+    assertEquals(result.usage, { credits: {}, evidence: {} });
+    const output = result.output as Record<string, unknown>;
+    assertEquals(output.code, "sources_unavailable");
+    assertEquals(output.message, "No readable sources for this person");
+});

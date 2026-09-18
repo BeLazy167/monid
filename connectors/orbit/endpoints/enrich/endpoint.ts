@@ -95,6 +95,42 @@ export default defineEndpoint({
                 typeof link === "string" && link.charAt(0) === "/"
                     ? link
                     : "/v3/enrich/requests/" + encodeURIComponent(requestId);
+            if (status === "failed") {
+                // A build that fails on the submit reports its reason at
+                // `failure`, where the provider's fromError does not look —
+                // lifted into Orbit's own error envelope here, exactly as
+                // the poll does it, so the caller reads the reason rather
+                // than the generic fallback.
+                const failure = utils.json.optionalGet(res.body, "$.failure");
+                const message = utils.json.optionalGet(
+                    failure ?? null,
+                    "$.message",
+                );
+                const code = utils.json.optionalGet(failure ?? null, "$.code");
+                logger.warn("orbit enrich failed on submit", { requestId });
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: 500,
+                    providerHttpStatus: res.status,
+                    output: {
+                        status: "failed",
+                        error: {
+                            code: typeof code === "string"
+                                ? code
+                                : "enrich_failed",
+                            message:
+                                typeof message === "string" && message !== ""
+                                    ? message
+                                    : "Orbit enrichment failed",
+                        },
+                        request_id: requestId,
+                    },
+                    state: {
+                        externalRunId: requestId,
+                        data: { dispatched: rebuilding, statusPath },
+                    },
+                };
+            }
             if (status !== "running") {
                 logger.info("orbit enrich settled on submit", {
                     requestId,
@@ -102,10 +138,7 @@ export default defineEndpoint({
                 });
                 return {
                     kind: "COMPLETED",
-                    httpStatus: status === "failed" ? 500 : res.status,
-                    ...(status === "failed"
-                        ? { providerHttpStatus: res.status }
-                        : {}),
+                    httpStatus: res.status,
                     output: res.body,
                     state: {
                         externalRunId: requestId,

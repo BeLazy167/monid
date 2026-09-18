@@ -77,6 +77,13 @@ mid-build; and `candidate_discovery` for each remaining non-failed result whose
 - **THEN** usage is `{credits: {default: 3}, evidence: {index_search: 1,
   candidate_discovery: 2}}`
 
+#### Scenario: A submit-time failure reads like a poll-time one
+- **WHEN** the submit answers 200 with `status: "failed"` and its reason at
+  `candidate_discovery_failure` (or, for an enrichment, at `failure`)
+- **THEN** the start phase lifts that reason into Orbit's own
+  `{status, error: {code, message}}` envelope before settling, so the same
+  `output.fromError` reads a submit-time and a poll-time failure alike
+
 #### Scenario: A failed search is ours/theirs and bills nothing
 - **WHEN** the status route answers 200 with `status: "failed"`
 - **THEN** the run reports `httpStatus` 500 with `providerHttpStatus` 200,

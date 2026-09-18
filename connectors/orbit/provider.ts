@@ -5,13 +5,13 @@ import { defineProvider, presets } from "@shared/core";
  * JSON over HTTP against `https://api.orbitsearch.com`, bearer auth with an
  * `sk_orb_` key, one public version: v3.
  *
- * Three shapes live behind that one host:
+ * Two shapes live behind that one host:
  *
  *   - SYNC reads — a profile read and two status polls. One request, one
  *     answer.
  *   - ASYNC WORK — search and enrich. The submit answers `202` with a
  *     snapshot carrying the id and `status: "running"`; the caller polls the
- *     matching status route until the status is terminal. Four endpoints
+ *     matching status route until the status is terminal. Three endpoints
  *     carry a lifecycle so ONE monid run returns finished work; the status
  *     routes stay exposed for callers who would rather drive the poll
  *     themselves or resume a run started elsewhere.
@@ -45,7 +45,7 @@ import { defineProvider, presets } from "@shared/core";
  *
  *   profile_read         1  per profile read
  *   index_search         1  per 10 results returned from the Orbit index
- *   candidate_discovery  1  per profile discovery returns
+ *   candidate_discovery  1  per profile that discovery returns
  *   partial_profile      5  per profile built to partial depth
  *   full_profile        10  per profile built to full depth
  *
@@ -70,6 +70,11 @@ import { defineProvider, presets } from "@shared/core";
  *     The reserve is a CEILING, the public contract carries no settled
  *     figure, and billing a ceiling would overcharge every population that
  *     under-runs. Both population routes are held back with the watchers.
+ *   - A BULK job's rows are priced by the same lines, and a job DOES report
+ *     its own settled total on `billing.consumed_credits` — the one Orbit
+ *     surface a connector could bill exactly rather than bound from
+ *     observation. The bulk routes are held for an internal review on the
+ *     vendor's side, not for want of a settle; see the proposal.
  *   - `face_search` (100) rides an identity signal that is absent from the
  *     published request schema.
  *   - The company lines (`company_search`, `company_profile`,

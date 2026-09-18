@@ -130,6 +130,31 @@ Deno.test("orbit#v3/search: `sources` is a union, and a discovery row stays off 
     });
 });
 
+Deno.test("orbit#v3/search: a submit-time failure reads like a poll-time one", async () => {
+    const unit = await testSealedUnit("orbit#v3/search");
+    const result = await runEndpoint({
+        unit,
+        input: { body: { signals: { address: "12 Vine Street" } } },
+        mode: "replay",
+        fixture: await loadFixture(
+            `${chains}synthetic-search-failed-on-submit.json`,
+        ),
+    });
+
+    // The snapshot reports its reason at `candidate_discovery_failure`,
+    // which the provider's fromError does not read. Handing it back raw
+    // would publish "Orbit API error" and strand the reason in `raw`.
+    assertEquals(result.httpStatus, 500);
+    assertEquals(result.providerHttpStatus, 200);
+    assertEquals(result.usage, { credits: {}, evidence: {} });
+    const output = result.output as Record<string, unknown>;
+    assertEquals(output.code, "signals_unresolvable");
+    assertEquals(
+        output.message,
+        "The address could not be resolved to a person",
+    );
+});
+
 Deno.test("orbit#v3/search: a failed status LOOKUP keeps the run alive", async () => {
     const unit = await testSealedUnit("orbit#v3/search");
     const result = await runEndpoint({
