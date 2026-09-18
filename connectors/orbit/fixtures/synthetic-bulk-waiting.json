@@ -1,0 +1,142 @@
+{
+    "name": "synthetic-bulk-waiting",
+    "description": "A job that runs the account dry: `waiting_for_credits` is SLOW, not finished — Orbit resumes it by itself once credits land — so the run stays open on a backed-off cadence rather than abandoning a job still holding a reservation. `needs_attention` is the same shape with a five-minute cadence. The job then completes and settles 6. Synthetic.",
+    "calls": [
+        {
+            "req": {
+                "method": "POST",
+                "url": "{{request.url}}"
+            },
+            "res": {
+                "status": 202,
+                "body": {
+                    "job_id": "3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                    "request_id": "contacts-import-2026-09-18",
+                    "status": "queued",
+                    "cancel_requested": false,
+                    "counts": {
+                        "total": 2,
+                        "completed": 0,
+                        "failed": 0,
+                        "canceled": 0,
+                        "pending": 2
+                    },
+                    "billing": {
+                        "consumed_credits": 0,
+                        "held_credits": 12
+                    },
+                    "last_error": null,
+                    "created_at": "2026-09-18T12:00:00.000Z",
+                    "updated_at": "2026-09-18T12:01:00.000Z",
+                    "links": {
+                        "status": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                        "results": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/results",
+                        "cancel": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/cancel"
+                    }
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "https://api.orbitsearch.com/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "job_id": "3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                    "request_id": "contacts-import-2026-09-18",
+                    "status": "waiting_for_credits",
+                    "cancel_requested": false,
+                    "counts": {
+                        "total": 2,
+                        "completed": 1,
+                        "failed": 0,
+                        "canceled": 0,
+                        "pending": 1
+                    },
+                    "billing": {
+                        "consumed_credits": 6,
+                        "held_credits": 6
+                    },
+                    "last_error": null,
+                    "created_at": "2026-09-18T12:00:00.000Z",
+                    "updated_at": "2026-09-18T12:01:00.000Z",
+                    "links": {
+                        "status": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                        "results": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/results",
+                        "cancel": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/cancel"
+                    }
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "https://api.orbitsearch.com/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "job_id": "3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                    "request_id": "contacts-import-2026-09-18",
+                    "status": "needs_attention",
+                    "cancel_requested": false,
+                    "counts": {
+                        "total": 2,
+                        "completed": 1,
+                        "failed": 0,
+                        "canceled": 0,
+                        "pending": 1
+                    },
+                    "billing": {
+                        "consumed_credits": 6,
+                        "held_credits": 6
+                    },
+                    "last_error": null,
+                    "created_at": "2026-09-18T12:00:00.000Z",
+                    "updated_at": "2026-09-18T12:01:00.000Z",
+                    "links": {
+                        "status": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                        "results": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/results",
+                        "cancel": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/cancel"
+                    }
+                }
+            }
+        },
+        {
+            "req": {
+                "method": "GET",
+                "url": "https://api.orbitsearch.com/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b"
+            },
+            "res": {
+                "status": 200,
+                "body": {
+                    "job_id": "3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                    "request_id": "contacts-import-2026-09-18",
+                    "status": "completed_with_errors",
+                    "cancel_requested": false,
+                    "counts": {
+                        "total": 2,
+                        "completed": 1,
+                        "failed": 0,
+                        "canceled": 0,
+                        "pending": 0
+                    },
+                    "billing": {
+                        "consumed_credits": 6,
+                        "held_credits": 0
+                    },
+                    "last_error": null,
+                    "created_at": "2026-09-18T12:00:00.000Z",
+                    "updated_at": "2026-09-18T12:01:00.000Z",
+                    "links": {
+                        "status": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b",
+                        "results": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/results",
+                        "cancel": "/v3/search/bulk/3f2a91c4-5b6d-4e7f-8a9b-0c1d2e3f4a5b/cancel"
+                    }
+                }
+            }
+        }
+    ]
+}
