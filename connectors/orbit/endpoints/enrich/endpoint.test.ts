@@ -1,7 +1,8 @@
-import { assertEquals } from "@std/assert";
+import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
     estimateEndpoint,
+    liveSkip,
     loadFixture,
     runEndpoint,
     testSealedUnit,
@@ -96,4 +97,56 @@ Deno.test("orbit#v3/enrich/{profile_id} estimate: the depth asked for, once", as
         credits: { default: 10 },
         evidence: { full_profile: 1 },
     });
+});
+
+Deno.test("orbit#v3/enrich/{profile_id}: the REQUEST states the operation, not the echo", async () => {
+    const unit = await testSealedUnit("orbit#v3/enrich/{profile_id}");
+    const result = await runEndpoint({
+        unit,
+        input: {
+            pathParams: { profile_id: PROFILE },
+            body: { operation: "partial" },
+        },
+        mode: "replay",
+        fixture: await loadFixture(
+            `${chains}synthetic-enrich-echo-missing.json`,
+        ),
+    });
+
+    // The terminal snapshot omits `operation` and reports level 3. Reading
+    // the operation off the response would find no `partial`, fall to the
+    // full branch and charge 10 for a build the caller asked 5 for. The
+    // request is required input and is what Orbit priced.
+    assertEquals(result.httpStatus, 200);
+    assertEquals(result.usage, {
+        credits: { default: 5 },
+        evidence: { partial_profile: 1 },
+    });
+});
+
+Deno.test({
+    name:
+        "orbit#v3/enrich/{profile_id} live: a partial build settles from the real card",
+    ignore: liveSkip("orbit"),
+    fn: async () => {
+        const unit = await testSealedUnit("orbit#v3/enrich/{profile_id}");
+        const result = await runEndpoint({
+            unit,
+            input: {
+                pathParams: { profile_id: PROFILE },
+                body: { operation: "partial" },
+            },
+            mode: "live",
+        });
+        assertEquals(
+            result.isProviderError,
+            false,
+            JSON.stringify(result.output),
+        );
+        // A profile already at partial depth is a no-op and settles empty;
+        // one Orbit has to build settles 5. Both are correct answers here,
+        // so assert the pool rather than the number.
+        const pools = Object.keys(result.usage.credits);
+        assert(pools.length === 0 || pools.join() === "default", pools.join());
+    },
 });

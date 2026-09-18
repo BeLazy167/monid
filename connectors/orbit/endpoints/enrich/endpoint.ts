@@ -135,18 +135,25 @@ export default defineEndpoint({
                 path: previous?.statusPath ??
                     "/v3/enrich/requests/" + encodeURIComponent(requestId),
             });
-            if (
-                res.status === 408 || res.status === 429 ||
-                res.status === 500 || res.status === 502 ||
-                res.status === 503 || res.status === 504
-            ) {
+            if (res.status === 408 || res.status === 429 || res.status >= 500) {
                 // The status LOOKUP failed while the build keeps running and
-                // keeps drawing credits. RUNNING is the honest answer.
+                // keeps drawing credits. Orbit's error guide puts 429 and
+                // every temporary server failure in one retry class, so the
+                // whole 5xx range is held rather than a hand-picked four.
+                // `Retry-After` is in SECONDS and the v3 contract asks
+                // callers to honor it; an absent or malformed header falls
+                // back to a fixed backoff, clamped so a bad value cannot
+                // stall the run. Bounded by runMs.
+                const after = Number(res.headers["retry-after"]);
+                const pollAfterMs = Number.isFinite(after) && after > 0
+                    ? Math.min(Math.max(after * 1000, 1_000), 120_000)
+                    : 15_000;
                 logger.warn("orbit enrich status lookup transient", {
                     requestId,
                     status: res.status,
+                    pollAfterMs,
                 });
-                return { kind: "RUNNING", pollAfterMs: 15_000 };
+                return { kind: "RUNNING", pollAfterMs };
             }
             if (res.status < 200 || res.status >= 300) {
                 return {
@@ -235,10 +242,13 @@ export default defineEndpoint({
             if (dispatched !== true || status !== "completed") {
                 return { counts: {} };
             }
-            const operation = utils.json.optionalGet(
-                data.output,
-                "$.operation",
-            );
+            // The REQUEST states the operation — it is required input, one
+            // operation per request, and it is what Orbit priced. The
+            // response echoes it, but the contract does not require that
+            // echo, and a missing one would drop a 5-credit partial into the
+            // 10-credit branch. `generation_level` stays the response's job:
+            // it is the depth actually reached.
+            const operation = data.input.body.operation;
             const level = utils.json.optionalNum(
                 data.output,
                 "$.generation_level",

@@ -1,6 +1,6 @@
 {
     "name": "synthetic-search-transient",
-    "description": "A status LOOKUP that fails (503) while the search keeps running and keeps drawing credits. The poll holds the run open and backs the cadence off rather than settling it, because declaring the run terminal here abandons work Orbit still bills for. The following tick reads the completed snapshot. Synthetic.",
+    "description": "A status LOOKUP that fails while the search keeps running and keeps drawing credits. The 599 is deliberate: Orbit's error guide puts every temporary server failure in one retry class, so a proxy status outside the common four must be held exactly like a 503. The Retry-After header (seconds, as Orbit sends it) sets the next tick's cadence. The following tick reads the completed snapshot. Synthetic.",
     "calls": [
         {
             "req": {
@@ -11,7 +11,7 @@
                 "status": 202,
                 "body": {
                     "search_id": "SEARCH5",
-                    "request_id": "req-synthetic-5",
+                    "request_id": "req-search5",
                     "status": "running",
                     "candidate_discovery": false,
                     "profile_depth": "partial",
@@ -19,7 +19,7 @@
                     "profile_upgrades_completed": false,
                     "results": [],
                     "created_at": "2026-09-17T12:00:00.000Z",
-                    "updated_at": "2026-09-17T12:00:00.000Z",
+                    "updated_at": "2026-09-17T12:01:00.000Z",
                     "links": {
                         "status": "/v3/search/SEARCH5"
                     }
@@ -29,10 +29,13 @@
         {
             "req": {
                 "method": "GET",
-                "url": "{{request.url}}/SEARCH5"
+                "url": "{{request.origin}}/v3/search/SEARCH5"
             },
             "res": {
-                "status": 503,
+                "status": 599,
+                "headers": {
+                    "retry-after": "7"
+                },
                 "body": {
                     "status": "failed",
                     "error": {
@@ -45,13 +48,13 @@
         {
             "req": {
                 "method": "GET",
-                "url": "{{request.url}}/SEARCH5"
+                "url": "{{request.origin}}/v3/search/SEARCH5"
             },
             "res": {
                 "status": 200,
                 "body": {
                     "search_id": "SEARCH5",
-                    "request_id": "req-synthetic-5",
+                    "request_id": "req-search5",
                     "status": "completed",
                     "candidate_discovery": false,
                     "profile_depth": "partial",
@@ -68,7 +71,7 @@
                         }
                     ],
                     "created_at": "2026-09-17T12:00:00.000Z",
-                    "updated_at": "2026-09-17T12:00:40.000Z",
+                    "updated_at": "2026-09-17T12:01:00.000Z",
                     "links": {
                         "status": "/v3/search/SEARCH5"
                     }

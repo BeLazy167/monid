@@ -26,6 +26,20 @@ import { defineProvider, presets } from "@shared/core";
  * `watchers:write` or `webhooks:write`, so the provider key never has to
  * carry them.
  *
+ * ONE STATUS-READ RULE, spelled the same way in all three lifecycles —
+ * Orbit's error guide puts `429` and every temporary server failure in a
+ * single retry class, so a status read answering `408`, `429` or ANY `5xx`
+ * is a lookup that failed rather than work that ended. Each one holds the
+ * run open. That matters more here than politeness: the search or build is
+ * still running on Orbit's side and still drawing credits, so settling on a
+ * failed lookup abandons work the account is charged for. `Retry-After`
+ * arrives in SECONDS on Orbit's `429`s and the v3 contract asks callers to
+ * honor it, so it sets the next tick's cadence — clamped to [1s, 120s] so a
+ * malformed header cannot stall a run, and bounded by `runMs` regardless.
+ * The lifecycles also FOLLOW THE LINK Orbit hands back (`links.status`),
+ * which is what the v3 guide tells every caller to poll, and fall back to
+ * the documented path shape.
+ *
  * BILLING — Orbit publishes its rate card at `GET /v2/developer/pricing`,
  * unauthenticated, and the lines below are pinned from version `2026-09-10`:
  *

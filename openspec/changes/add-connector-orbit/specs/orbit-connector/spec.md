@@ -64,6 +64,13 @@ mid-build; and `candidate_discovery` for each remaining non-failed result whose
   mid-build
 - **THEN** usage is `{credits: {default: 2}, evidence: {index_search: 12}}`
 
+#### Scenario: A union of origins stays off the cached line
+- **WHEN** a result's `sources` carries both `search` and
+  `candidate_discovery`
+- **THEN** it is counted on the discovery line alone, because Orbit excludes
+  discovery rows from the cached-result count and bills the row against the
+  single origin that created it
+
 #### Scenario: A candidate merely resolved bills 1
 - **WHEN** a discovery search returns one index result and two
   `candidate_discovery` results that were never observed mid-build
@@ -77,7 +84,8 @@ mid-build; and `candidate_discovery` for each remaining non-failed result whose
   error envelope so one mapper reads it
 
 #### Scenario: A failed status lookup keeps the run alive
-- **WHEN** a status read answers 408, 429 or 5xx while the search is running
+- **WHEN** a status read answers 408, 429 or ANY 5xx while the search is
+  running
 - **THEN** the poll returns RUNNING with a backed-off cadence rather than
   settling, because the search keeps running and keeps drawing credits
 
@@ -121,6 +129,40 @@ parent status SHALL be `completed_with_errors` when any child ended other than
   already `completed`, and the running child completes at level 2
 - **THEN** usage is `{credits: {default: 5}, evidence: {partial_profile: 1}}`
   and the output carries both children under `request_id` `BATCH1`
+
+### Requirement: One status-read retry rule across every lifecycle
+Every lifecycle SHALL treat a status read answering `408`, `429` or any `5xx`
+as a failed LOOKUP rather than finished work, returning RUNNING so the run
+survives — Orbit's error guide puts `429` and every temporary server failure
+in one retry class, and the work keeps drawing credits while the lookup is
+unavailable. When the response carries `Retry-After` (seconds), it SHALL set
+the next tick's cadence, clamped to [1s, 120s]; otherwise a fixed backoff
+applies. Every lifecycle SHALL poll the route Orbit names in `links.status`,
+falling back to the documented path shape.
+
+#### Scenario: An uncommon 5xx is held like a 503
+- **WHEN** a search status read answers `599`
+- **THEN** the poll returns RUNNING rather than settling the run
+
+#### Scenario: Retry-After sets the cadence
+- **WHEN** a transient status read carries `Retry-After: 7`
+- **THEN** the next tick is scheduled 7 seconds out
+
+#### Scenario: A transient final read re-opens a batch child
+- **WHEN** the batch's final sweep reads a completed child and gets a `503`
+- **THEN** that child is re-opened for a later tick instead of being
+  published as `failed`, so its depth line survives into evidence
+
+### Requirement: The request states what was priced
+Usage fns SHALL read `operation` and `profile_depth` from
+`data.input.body` — both are request fields Orbit priced the work against,
+and one operation applies to a whole batch. The terminal response's
+`generation_level` SHALL remain the source for the depth actually reached.
+
+#### Scenario: A missing echo does not change the price
+- **WHEN** a dispatched `partial` enrichment completes at
+  `generation_level` 3 and its snapshot omits `operation`
+- **THEN** usage is `{credits: {default: 5}, evidence: {partial_profile: 1}}`
 
 ### Requirement: Reads are free
 `orbit#v3/search/{search_id}` and `orbit#v3/enrich/requests/{request_id}`

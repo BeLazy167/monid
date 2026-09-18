@@ -64,3 +64,29 @@ Deno.test("orbit#v3/enrich: the vendor's cap of 20 is the mirror's cap", async (
     assertEquals(body.properties?.profile_ids.maxItems, 20);
     assertEquals(body.required, ["profile_ids", "operation"]);
 });
+
+Deno.test("orbit#v3/enrich: a transient FINAL read re-opens the child instead of failing it", async () => {
+    const unit = await testSealedUnit("orbit#v3/enrich");
+    const result = await runEndpoint({
+        unit,
+        input: {
+            body: { profile_ids: ["PROF_A", "PROF_B"], operation: "partial" },
+        },
+        mode: "replay",
+        fixture: await loadFixture(
+            `${chains}synthetic-enrich-batch-final-transient.json`,
+        ),
+    });
+
+    // The final read is the same lookup the poll makes. Publishing a
+    // `failed` row on a 503 would both lie about the child and drop its
+    // depth line from evidence — settling a build Orbit charged for at zero.
+    assertEquals(result.httpStatus, 200);
+    const output = result.output as Record<string, unknown>;
+    assertEquals(output.status, "completed");
+    assertEquals((output.results as unknown[]).length, 2);
+    assertEquals(result.usage, {
+        credits: { default: 5 },
+        evidence: { partial_profile: 1 },
+    });
+});

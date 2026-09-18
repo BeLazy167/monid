@@ -61,3 +61,29 @@
       (the settle rules), `skill.md` + `llms.txt` (the agent endpoint set),
       the hosted MCP server's four tools and the ChatGPT app's tool
       descriptions (scopes, the `regenerate` warning, quote-then-confirm)
+
+## 6. Review follow-ups
+
+- [x] 6.1 One status-read retry rule in all three lifecycles: `408`, `429` and
+      EVERY `5xx` hold the run open (Orbit's error guide has one retry class,
+      so a 501 or 520 from a proxy is the same answer as a 503)
+- [x] 6.2 `Retry-After` (seconds) sets the next tick's cadence, clamped to
+      [1s, 120s] — the v3 contract asks every caller to honor it.
+      `shared/testing/fixtures.ts` gains `retry-after` in the recorded-header
+      allowlist so the path is replay-testable
+- [x] 6.3 The batch's FINAL sweep re-opens a transiently-unreadable child
+      instead of publishing it `failed` — a failed row also dropped that
+      child's depth line from evidence
+- [x] 6.4 Usage fns read `operation` / `profile_depth` from the REQUEST; the
+      response echo is not contractual and a missing one moved a 5-credit
+      partial into the 10-credit branch
+- [x] 6.5 `sources` is a UNION — a row carrying `candidate_discovery` stays
+      off the cached-result line, matching Orbit's exclusion rule and its
+      single-origin settle
+- [x] 6.6 Every lifecycle follows `links.status`, the route the v3 guide tells
+      callers to poll, with the documented path as fallback
+- [x] 6.7 The single-use `personSearchShape` is inlined into the search body
+      and `connectors/orbit/schema/` is gone — one call site, no abstraction
+- [x] 6.8 Test matrix completed on the sync endpoints: provider-error,
+      schema-gate and `liveSkip("orbit")` live cases; the rate card and its
+      version are cited at the estimate assertions

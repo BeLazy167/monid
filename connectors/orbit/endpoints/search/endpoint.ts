@@ -98,6 +98,9 @@ export default defineEndpoint({
                 "Profile ids observed mid-build on some tick — the results " +
                     "Orbit built rather than read.",
             ),
+            statusPath: z.string().optional().describe(
+                "The status route Orbit named in `links.status`.",
+            ),
         }),
         start: async ({ utils, logger }) => {
             const res = await utils.request();
@@ -126,6 +129,13 @@ export default defineEndpoint({
                     ) built.push(id);
                 }
             }
+            // Follow the link Orbit gave us — the v3 contract tells callers
+            // to poll `links.status` — and fall back to the documented shape.
+            const link = utils.json.optionalGet(res.body, "$.links.status");
+            const statusPath =
+                typeof link === "string" && link.charAt(0) === "/"
+                    ? link
+                    : "/v3/search/" + encodeURIComponent(searchId);
             const status = utils.json.optionalGet(res.body, "$.status");
             if (status !== "running") {
                 // Orbit answered the whole search on the submit — a 200 with
@@ -142,12 +152,18 @@ export default defineEndpoint({
                         ? { providerHttpStatus: res.status }
                         : {}),
                     output: res.body,
-                    state: { externalRunId: searchId, data: { built } },
+                    state: {
+                        externalRunId: searchId,
+                        data: { built, statusPath },
+                    },
                 };
             }
             return {
                 kind: "RUNNING",
-                state: { externalRunId: searchId, data: { built } },
+                state: {
+                    externalRunId: searchId,
+                    data: { built, statusPath },
+                },
             };
         },
         poll: async ({ data, utils, logger }) => {
@@ -158,25 +174,35 @@ export default defineEndpoint({
                     { retriable: false },
                 );
             }
+            const previous = data.lifecycle.state.data;
             const res = await utils.http({
                 method: "GET",
-                url: data.request.url + "/" + encodeURIComponent(searchId),
+                path: previous?.statusPath ??
+                    "/v3/search/" + encodeURIComponent(searchId),
             });
-            if (
-                res.status === 408 || res.status === 429 ||
-                res.status === 500 || res.status === 502 ||
-                res.status === 503 || res.status === 504
-            ) {
-                // The status LOOKUP failed, not the search. The search keeps
-                // running and keeps drawing credits, so declaring the run
-                // terminal here would abandon work Orbit still bills us for.
-                // RUNNING is also the honest answer: we could not read the
-                // state. Bounded by runMs.
+            if (res.status === 408 || res.status === 429 || res.status >= 500) {
+                // The status LOOKUP failed, not the search. Orbit's error
+                // guide puts 429 and every temporary server failure in one
+                // retry class, so the whole 5xx range is held rather than a
+                // hand-picked four — a 501 or 520 from a proxy is the same
+                // "could not read the state" answer. The search keeps running
+                // and keeps drawing credits, so settling here would abandon
+                // work Orbit still bills us for. Bounded by runMs.
+                //
+                // `Retry-After` is in SECONDS on Orbit's 429s, and the v3
+                // contract asks callers to honor it; a malformed or absent
+                // header falls back to a fixed backoff, and the value is
+                // clamped so a bad header cannot stall the run.
+                const after = Number(res.headers["retry-after"]);
+                const pollAfterMs = Number.isFinite(after) && after > 0
+                    ? Math.min(Math.max(after * 1000, 1_000), 120_000)
+                    : 15_000;
                 logger.warn("orbit search status lookup transient", {
                     searchId,
                     status: res.status,
+                    pollAfterMs,
                 });
-                return { kind: "RUNNING", pollAfterMs: 15_000 };
+                return { kind: "RUNNING", pollAfterMs };
             }
             if (res.status < 200 || res.status >= 300) {
                 return {
@@ -188,8 +214,7 @@ export default defineEndpoint({
             // Accumulate the build signal: WHOLE-STATE semantics (D21) mean
             // the returned state replaces the previous one wholesale, so the
             // previous ids are carried forward by hand.
-            const seen = data.lifecycle.state.data?.built ?? [];
-            const built = seen.slice();
+            const built = (previous?.built ?? []).slice();
             const results = utils.json.optionalGet(res.body, "$.results");
             if (Array.isArray(results)) {
                 for (const row of results) {
@@ -201,7 +226,10 @@ export default defineEndpoint({
                     ) built.push(id);
                 }
             }
-            const next = { externalRunId: searchId, data: { built } };
+            const next = {
+                externalRunId: searchId,
+                data: { built, statusPath: previous?.statusPath },
+            };
             const status = utils.json.optionalGet(res.body, "$.status");
             if (status === "running" || status === undefined) {
                 return { kind: "RUNNING", state: next };
@@ -344,11 +372,12 @@ export default defineEndpoint({
                 ? observed.map((id) => String(id))
                 : [];
             const rows = utils.json.optionalGet(data.output, "$.results");
-            const depth =
-                utils.json.optionalGet(data.output, "$.profile_depth") ===
-                        "full"
-                    ? "full_profile"
-                    : "partial_profile";
+            // The REQUEST states the depth. The snapshot echoes it, but the
+            // request is what Orbit priced the work against and it carries a
+            // bound default, so it is the field to read.
+            const depth = data.input.body.profile_depth === "full"
+                ? "full_profile"
+                : "partial_profile";
             let indexed = 0;
             let discovered = 0;
             let builtDelivered = 0;
@@ -361,10 +390,20 @@ export default defineEndpoint({
                     const names = Array.isArray(origins)
                         ? origins.map((origin) => String(origin))
                         : [];
-                    if (names.includes("search")) indexed += 1;
+                    // "Candidate Discovery results are excluded from the
+                    // cached-result count" (Orbit's credits page). `sources`
+                    // is a UNION — a person found both ways carries both
+                    // origins — while Orbit bills the row against the single
+                    // origin that created it. Reading any discovery marking
+                    // as a discovery row keeps the two lines exclusive, which
+                    // is the reading that cannot overcharge.
+                    const fromDiscovery = names.includes("candidate_discovery");
+                    if (!fromDiscovery && names.includes("search")) {
+                        indexed += 1;
+                    }
                     if (typeof id === "string" && built.includes(id)) {
                         builtDelivered += 1;
-                    } else if (names.includes("candidate_discovery")) {
+                    } else if (fromDiscovery) {
                         discovered += 1;
                     }
                 }

@@ -2,6 +2,7 @@ import { assert, assertEquals } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
     estimateEndpoint,
+    liveSkip,
     loadFixture,
     runEndpoint,
     testSealedUnit,
@@ -102,6 +103,33 @@ Deno.test("orbit#v3/search: a failed search is ours/theirs, and bills nothing", 
     );
 });
 
+Deno.test("orbit#v3/search: `sources` is a union, and a discovery row stays off the cached line", async () => {
+    const unit = await testSealedUnit("orbit#v3/search");
+    const result = await runEndpoint({
+        unit,
+        input: {
+            body: {
+                query: "people at Northwind",
+                candidate_discovery: true,
+                limit: 10,
+            },
+        },
+        mode: "replay",
+        fixture: await loadFixture(
+            `${chains}synthetic-search-union-origins.json`,
+        ),
+    });
+
+    // Ten cached results ⇒ one block. The eleventh carries BOTH origins, and
+    // Orbit excludes discovery rows from the cached-result count — so it
+    // belongs on the discovery line alone. Counting it twice would round the
+    // cached count up to a second block and settle 3.
+    assertEquals(result.usage, {
+        credits: { default: 2 },
+        evidence: { index_search: 10, candidate_discovery: 1 },
+    });
+});
+
 Deno.test("orbit#v3/search: a failed status LOOKUP keeps the run alive", async () => {
     const unit = await testSealedUnit("orbit#v3/search");
     const result = await runEndpoint({
@@ -111,9 +139,12 @@ Deno.test("orbit#v3/search: a failed status LOOKUP keeps the run alive", async (
         fixture: await loadFixture(`${chains}synthetic-search-transient.json`),
     });
 
-    // The 503 is the STATUS ROUTE failing, not the search. Settling there
-    // would abandon a search Orbit still bills us for, so the poll backs off
-    // and the next tick reads the completed snapshot.
+    // The 599 is the STATUS ROUTE failing, not the search — and it is a 599
+    // on purpose: Orbit's error guide puts every temporary server failure in
+    // one retry class, so a proxy status outside the common four has to be
+    // held exactly like a 503. Settling there would abandon a search Orbit
+    // still bills us for, so the poll backs off — honoring the Retry-After
+    // the fixture sends — and the next tick reads the completed snapshot.
     assertEquals(result.httpStatus, 200);
     assertEquals(result.usage, {
         credits: { default: 1 },
@@ -138,6 +169,10 @@ Deno.test("orbit#v3/search: a vendor refusal is zero-billed data", async () => {
 });
 
 Deno.test("orbit#v3/search estimate: the ceiling the caller authorized", async () => {
+    // Rates pinned from Orbit's own rate card —
+    // GET https://api.orbitsearch.com/v2/developer/pricing, version
+    // 2026-09-10 (unauthenticated): index_search 1 per 10 results,
+    // candidate_discovery 1, partial_profile 5, full_profile 10.
     const unit = await testSealedUnit("orbit#v3/search");
 
     // Defaults bind at the schema, so a bare query still estimates a
@@ -191,4 +226,27 @@ Deno.test("orbit#v3/search: the mirror carries what Orbit accepts, and binds its
     // 400; it lives in the descriptions rather than in a refinement that
     // would vanish at JSON Schema compilation.
     assertEquals(body.required, undefined);
+});
+
+Deno.test({
+    name: "orbit#v3/search live: a named person settles against the real card",
+    ignore: liveSkip("orbit"),
+    fn: async () => {
+        const unit = await testSealedUnit("orbit#v3/search");
+        const result = await runEndpoint({
+            unit,
+            input: { body: { query: "Sam Altman", limit: 1 } },
+            mode: "live",
+        });
+        assertEquals(
+            result.isProviderError,
+            false,
+            JSON.stringify(result.output),
+        );
+        // Credits cannot be pinned live — what a query returns is the
+        // search's answer, not its question. Assert the SHAPE instead: a
+        // settled run draws from the one declared pool and nothing else.
+        const pools = Object.keys(result.usage.credits);
+        assert(pools.length === 0 || pools.join() === "default", pools.join());
+    },
 });
