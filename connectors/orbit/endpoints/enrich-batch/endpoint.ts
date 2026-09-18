@@ -41,9 +41,9 @@ export default defineEndpoint({
             "child per profile, each with its own status, depth and " +
             "profile. Profiles already at the depth you asked for come back " +
             "as they stand and cost nothing; the rest are 5 credits each " +
-            "for `partial` and 10 each for `full` and `regenerate`. For a " +
-            "list longer than 20, or for people Orbit has yet to identify, " +
-            "use `orbit#v3/search/bulk`.",
+            "for `partial` and 10 each for `full` and `regenerate`. Use " +
+            "`orbit#v3/search` first for anyone Orbit has yet to identify — " +
+            "it returns the profile ids this endpoint takes.",
         docsUrl: "https://docs.orbitsearch.com/api/enrich-batch",
         categories: ["people-enrichment"],
     },

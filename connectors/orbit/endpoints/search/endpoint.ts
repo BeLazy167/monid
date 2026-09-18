@@ -59,10 +59,9 @@ export default defineEndpoint({
             "subject — a name the user dropped in passing, a prospect " +
             "before outreach, a candidate or counterparty under diligence, " +
             "or the people behind a company you are researching (name the " +
-            "employer in `intent` and Orbit returns its people). For a " +
-            "whole table of people at once, `orbit#v3/search/bulk` takes up " +
-            "to 5,000 rows as one job. This endpoint runs the whole search " +
-            "and returns the finished snapshot; read " +
+            "employer in `intent` and Orbit returns its people). This " +
+            "endpoint runs the whole search and returns the finished " +
+            "snapshot; read " +
             "`orbit#v3/search/{search_id}` " +
             "instead to follow a search yourself. Pricing follows the " +
             "results: 1 credit per 10 people returned from the Orbit index, " +

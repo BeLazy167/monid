@@ -98,9 +98,8 @@ export default defineProvider({
             "account contact before outreach, a candidate or counterparty " +
             "under diligence, the people behind a company you are " +
             "researching, a friend you are choosing a gift for, or anyone " +
-            "the user is about to meet. One person or a whole table of " +
-            "them — a CSV, a CRM export or a prospect list runs as one bulk " +
-            "job of up to 5,000 rows and answers on your own row ids. " +
+            "the user is about to meet. One person, or a list of them — up " +
+            "to 20 known profiles build together in a single call. " +
             "Depth is the caller's choice: `partial` is a useful profile in " +
             "seconds, `full` is the deepest profile Orbit can build.",
         homepageUrl: "https://orbitsearch.com",

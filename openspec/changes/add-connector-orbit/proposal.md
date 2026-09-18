@@ -25,24 +25,12 @@ exists only while a run is in flight.
 
 ## What Changes
 
-- **connectors/orbit** — 10 endpoints against `https://api.orbitsearch.com`,
+- **connectors/orbit** — 6 endpoints against `https://api.orbitsearch.com`,
   bearer auth (`sk_orb_` keys) needing only the `search:read` and
   `profile:read` scopes, one credit pool, a provider-level
   `output.fromError`, and no provider lifecycle.
-  - 6 sync: profile read, search status, enrichment status, and the three
-    free bulk-job readers (status, results, cancel).
-  - 4 async: search, enrich, batch enrich and bulk search — each carrying
-    its own lifecycle.
-- **Bulk search is the CSV path, and the one EXACT bill.** Up to 5,000
-  searches as one job, each row carrying the caller's own `id` which returns
-  on the matching result. It is the only endpoint here whose settle is not a
-  derived lower bound: a job reports `billing.consumed_credits`, its own
-  cumulative charge after Orbit "releases unused credits", so a
-  `usage.consolidate` claim settles it outright. It also has a cancel route,
-  so `lifecycle.stop` cancels undispatched rows when a run hits its budget.
-  `waiting_for_credits` and `needs_attention` are slow rather than finished —
-  Orbit resumes the first itself and retries the second about every five
-  minutes — so both keep the run alive on a backed-off cadence.
+  - 3 sync: profile read, search status, enrichment status.
+  - 3 async: search, enrich, batch enrich — each carrying its own lifecycle.
 - **The poll is the meter (search).** Orbit charges 5 or 10 credits for a
   profile it BUILT and nothing for one it already held, and the two are
   indistinguishable in the terminal snapshot — both read `ready` at the depth
@@ -70,8 +58,16 @@ exists only while a run is in flight.
   depth authorizes up to 1,010 credits while a typical cached search settles
   at 1. An agent that reads `estimate` before committing sees the difference;
   one that does not, finds out afterwards.
-- 12 synthetic fixture chains and 18 replay tests, covering both zero-settle
-  regressions (the cached search, the no-op enrich) explicitly.
+- 17 synthetic fixture chains and 26 replay tests, covering both zero-settle
+  regressions (the cached search, the no-op enrich) explicitly, plus a
+  runtime schema gate on every endpoint that takes an input.
+- **Catalog positioning.** `discover` ranks on `meta.description`, so the
+  copy is the product surface. The provider and endpoint descriptions name
+  the jobs an agent actually arrives with — a person the user just
+  mentioned, a prospect before outreach, a candidate or counterparty under
+  diligence, the people behind a company being researched — while keeping
+  "the deepest available context about a PERSON" as the spine rather than
+  narrowing into a sales-tool pitch.
 
 ## Capabilities
 
@@ -87,6 +83,15 @@ exists only while a run is in flight.
   call is free while it commits an open-ended draw is the one thing a billing
   model must not do. It arrives when the two platforms have agreed how a
   recurring charge settles.
+- **Bulk search is held back** (`/v3/search/bulk` and its three reads) —
+  pending an internal review on the vendor side rather than on any doubt
+  about the shape. It is worth recording what that review starts from,
+  because it is the opposite of the population case below: a bulk job
+  reports `billing.consumed_credits`, its own cumulative charge after Orbit
+  "releases unused credits", so it is the one Orbit surface a connector can
+  settle EXACTLY rather than bounding from observation. It also exposes a
+  cancel route, so a run that hits its budget can stop the undispatched
+  remainder instead of leaving it to charge on.
 - **Population search is held back** (`/v3/search/populations` and its
   quote), and this one is worth stating precisely because the endpoint LOOKS
   settleable. A population is priced as one number and reserved when the
@@ -112,10 +117,10 @@ exists only while a run is in flight.
 - No dollar conversion in the doc. Orbit's packages are a flat $0.01/credit at
   every tier, and the conversion stays the broker card's job.
 
-What ships is exactly the set that settles inside its own run. A bulk job
-qualifies where a population does not, and the difference is worth stating
-plainly: a population reserves a ceiling and never reports what it settled,
-while a bulk job reports the settled figure itself.
+The six that remain are exactly the endpoints that settle inside their own
+run — and, separately, the core of the request/response surface Orbit's own
+agent skill (`docs.orbitsearch.com/skill.md`) and hosted MCP server publish
+for this job.
 
 ## Impact
 
