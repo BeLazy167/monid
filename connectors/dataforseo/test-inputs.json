@@ -459,6 +459,119 @@
             "target": "dataforseo.com"
         }
     },
+    "business/categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "google-business/extended-reviews": {
+        "body": {
+            "depth": 20,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-business/info": {
+        "body": {
+            "keyword": "seo api",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-business/locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "google-business/questions": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 20,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-business/reviews": {
+        "body": {
+            "depth": 10,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-business/updates": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 10,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-hotels/info": {
+        "body": {
+            "hotel_identifier": "ChIJ_test_hotel",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-hotels/search": {
+        "body": {
+            "depth": 20,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "business/listing-categories": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "business/listing-filters": {},
+    "business/listings": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "tripadvisor/locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "tripadvisor/reviews": {
+        "body": {
+            "depth": 10,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "tripadvisor/search": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 30,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "trustpilot/reviews": {
+        "body": {
+            "domain": "dataforseo.com",
+            "depth": 20
+        }
+    },
+    "trustpilot/search": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 10
+        }
+    },
     "content/categories": {
         "queryParams": {
             "limit": 3,
@@ -497,6 +610,45 @@
     "content/summary": {
         "body": {
             "keyword": "seo api"
+        }
+    },
+    "domain/domain-technologies": {
+        "body": {
+            "target": "dataforseo.com"
+        }
+    },
+    "domain/domains-by-html-terms": {
+        "body": {
+            "search_terms": [
+                "example"
+            ],
+            "limit": 3
+        }
+    },
+    "domain/domains-by-technology": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "domain/technologies-aggregation": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "domain/technologies-summary": {
+        "body": {}
+    },
+    "domain/technology-catalog": {},
+    "domain/technology-filters": {},
+    "domain/technology-stats": {
+        "body": {
+            "technology": "example"
+        }
+    },
+    "domain/whois-filters": {},
+    "domain/whois": {
+        "body": {
+            "limit": 3
         }
     },
     "keywords/bing-audience-estimation": {
@@ -1097,6 +1249,72 @@
     "labs/top-searches": {
         "body": {
             "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "amazon/asin": {
+        "body": {
+            "asin": "B08G4KG9GD",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "amazon/locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "amazon/products": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 48,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "amazon/sellers": {
+        "body": {
+            "asin": "B08G4KG9GD",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-shopping/locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "google-shopping/product-info": {
+        "body": {
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-shopping/products": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 40,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-shopping/seller-ad-url": {
+        "pathParams": {
+            "shop_ad_aclk": "DChcSEwjs"
+        }
+    },
+    "google-shopping/sellers": {
+        "body": {
+            "depth": 20,
             "location_code": 2840,
             "language_code": "en"
         }
