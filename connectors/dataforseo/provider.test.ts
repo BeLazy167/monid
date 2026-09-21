@@ -130,7 +130,39 @@ const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
  * A new endpoint must state its row here.
  */
 const RATE: Record<string, string> = {
+    "dataforseo#ai/chatgpt-models": "free",
     "dataforseo#ai/chatgpt-response": "flat 0.0006",
+    "dataforseo#ai/chatgpt-search": "flat 0.004",
+    "dataforseo#ai/chatgpt-search-locations": "free",
+    "dataforseo#ai/claude-models": "free",
+    "dataforseo#ai/claude-response": "flat 0.0006",
+    "dataforseo#ai/gemini-models": "free",
+    "dataforseo#ai/gemini-response": "flat 0.0006",
+    "dataforseo#ai/gemini-search": "flat 0.004",
+    "dataforseo#ai/keyword-filters": "free",
+    "dataforseo#ai/keyword-locations": "free",
+    "dataforseo#ai/keyword-search-volume": "rows 0.01+0.0001",
+    "dataforseo#ai/mentions-filters": "free",
+    "dataforseo#ai/mentions-historical": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-locations": "free",
+    "dataforseo#ai/mentions-multi-target-metrics": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-search": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-target-metrics": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-timeseries-delta": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-timeseries-new-lost": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-top-brand-categories": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-top-brands": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-top-domains": "rows 0.1+0.001",
+    "dataforseo#ai/mentions-top-pages": "rows 0.1+0.001",
+    "dataforseo#ai/perplexity-models": "free",
+    "dataforseo#ai/perplexity-response": "flat 0.0006",
+    "dataforseo#app-store/app-info": "flat 0.0012",
+    "dataforseo#app-store/app-list": "page 0.0024/100",
+    "dataforseo#app-store/app-reviews": "page 0.0015/25",
+    "dataforseo#app-store/categories": "free",
+    "dataforseo#app-store/listing-categories": "free",
+    "dataforseo#app-store/listings": "rows 0.1+0.001",
+    "dataforseo#app-store/search": "page 0.0024/100",
     "dataforseo#backlinks/anchors": "rows 0.024+0.000036",
     "dataforseo#backlinks/backlinks": "rows 0.024+0.000036",
     "dataforseo#backlinks/bulk-backlinks": "rows 0.024+0.000036",
@@ -154,6 +186,22 @@ const RATE: Record<string, string> = {
     "dataforseo#backlinks/summary": "rows 0.024+0.000036",
     "dataforseo#backlinks/timeseries-new-lost": "rows 0.024+0.000036",
     "dataforseo#backlinks/timeseries-summary": "rows 0.024+0.000036",
+    "dataforseo#content/categories": "free",
+    "dataforseo#content/category-trends": "rows 0.024+0.000036",
+    "dataforseo#content/filters": "free",
+    "dataforseo#content/phrase-trends": "rows 0.024+0.000036",
+    "dataforseo#content/rating-distribution": "flat 0.024",
+    "dataforseo#content/search": "rows 0.024+0.000036",
+    "dataforseo#content/sentiment": "rows 0.024+0.000036",
+    "dataforseo#content/summary": "rows 0.024+0.000036",
+    "dataforseo#google-play/app-info": "flat 0.0012",
+    "dataforseo#google-play/app-list": "page 0.0024/100",
+    "dataforseo#google-play/app-reviews": "page 0.0015/150",
+    "dataforseo#google-play/categories": "free",
+    "dataforseo#google-play/listing-categories": "free",
+    "dataforseo#google-play/listings": "rows 0.1+0.001",
+    "dataforseo#google-play/locations": "free",
+    "dataforseo#google-play/search": "page 0.0024/100",
     "dataforseo#keywords/bing-audience-estimation": "flat 0.09",
     "dataforseo#keywords/bing-industries": "free",
     "dataforseo#keywords/bing-job-functions": "free",
@@ -332,7 +380,7 @@ const LLM_RESPONSES = [
 
 Deno.test("dataforseo docs: every endpoint is in the rate table", async () => {
     const ids = await dataforseoIds();
-    assertEquals(ids.length, 132);
+    assertEquals(ids.length, 180);
     assertEquals(Object.keys(RATE).sort(), ids);
 });
 
@@ -515,13 +563,13 @@ Deno.test("dataforseo docs: one Basic inject, one relay, one digest, one meter, 
     );
     assertEquals(
         byProvenance.filter(([mine]) => mine).map(([, n]) => n),
-        [101],
+        [125],
     );
     assertEquals(
         byProvenance.filter(([mine]) => !mine).map(([, n]) => n).sort((a, b) =>
             a - b
         ),
-        [6, 7, 18],
+        [9, 15, 31],
     );
     // two poll texts: task_get/advanced/{id} and task_get/{id}
     assertEquals(polls.size, 1);
@@ -591,8 +639,8 @@ Deno.test("dataforseo schemas: strict mirrors, the vendor's default on limit / d
             }
         }
     }
-    assertEquals(defaults.filter((n) => n === "limit").length, 35);
-    assertEquals(defaults.filter((n) => n === "depth").length, 15);
+    assertEquals(defaults.filter((n) => n === "limit").length, 44);
+    assertEquals(defaults.filter((n) => n === "depth").length, 21);
     // the dictionary query is ours: search and limit optional, country in
     // the path for the per-country lists
     const locations = bundle.endpoints["dataforseo#serp/google-locations"]

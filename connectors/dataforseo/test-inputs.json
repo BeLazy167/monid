@@ -1,8 +1,324 @@
 {
+    "ai/chatgpt-models": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
     "ai/chatgpt-response": {
         "body": {
             "user_prompt": "What is DataForSEO?",
             "model_name": "gpt-4o-mini"
+        }
+    },
+    "ai/chatgpt-search-locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "ai/chatgpt-search": {
+        "body": {
+            "keyword": "seo api",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/claude-models": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "ai/claude-response": {
+        "body": {
+            "user_prompt": "What is DataForSEO?",
+            "model_name": "gpt-4o-mini"
+        }
+    },
+    "ai/gemini-models": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "ai/gemini-response": {
+        "body": {
+            "user_prompt": "What is DataForSEO?",
+            "model_name": "gpt-4o-mini"
+        }
+    },
+    "ai/gemini-search": {
+        "body": {
+            "keyword": "seo api",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/keyword-filters": {},
+    "ai/keyword-locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "ai/keyword-search-volume": {
+        "body": {
+            "keywords": [
+                "seo api",
+                "rank tracker"
+            ],
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-filters": {},
+    "ai/mentions-historical": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "ai/mentions-multi-target-metrics": {
+        "body": {
+            "targets": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-search": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-target-metrics": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-timeseries-delta": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "date_from": "2026-01-01",
+            "date_to": "2026-02-01",
+            "group_range": "example",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-timeseries-new-lost": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "date_from": "2026-01-01",
+            "date_to": "2026-02-01",
+            "group_range": "example",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-top-brand-categories": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-top-brands": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-top-domains": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/mentions-top-pages": {
+        "body": {
+            "target": [
+                {
+                    "target": "dataforseo.com"
+                }
+            ],
+            "limit": 3,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "ai/perplexity-models": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "ai/perplexity-response": {
+        "body": {
+            "user_prompt": "What is DataForSEO?",
+            "model_name": "gpt-4o-mini"
+        }
+    },
+    "app-store/app-info": {
+        "body": {
+            "app_id": "com.spotify.music",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "app-store/app-list": {
+        "body": {
+            "app_collection": "example",
+            "depth": 100,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "app-store/app-reviews": {
+        "body": {
+            "app_id": "com.spotify.music",
+            "depth": 25,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "app-store/categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "app-store/listing-categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "app-store/listings": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "app-store/search": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 100,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-play/app-info": {
+        "body": {
+            "app_id": "com.spotify.music",
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-play/app-list": {
+        "body": {
+            "app_collection": "example",
+            "depth": 100,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-play/app-reviews": {
+        "body": {
+            "app_id": "com.spotify.music",
+            "depth": 150,
+            "location_code": 2840,
+            "language_code": "en"
+        }
+    },
+    "google-play/categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "google-play/listing-categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "google-play/listings": {
+        "body": {
+            "limit": 3
+        }
+    },
+    "google-play/locations": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        },
+        "pathParams": {
+            "country": "us"
+        }
+    },
+    "google-play/search": {
+        "body": {
+            "keyword": "seo api",
+            "depth": 100,
+            "location_code": 2840,
+            "language_code": "en"
         }
     },
     "backlinks/anchors": {
@@ -141,6 +457,46 @@
     "backlinks/timeseries-summary": {
         "body": {
             "target": "dataforseo.com"
+        }
+    },
+    "content/categories": {
+        "queryParams": {
+            "limit": 3,
+            "search": "united"
+        }
+    },
+    "content/category-trends": {
+        "body": {
+            "category_code": 10001,
+            "date_from": "2026-01-01"
+        }
+    },
+    "content/filters": {},
+    "content/phrase-trends": {
+        "body": {
+            "keyword": "seo api",
+            "date_from": "2026-01-01"
+        }
+    },
+    "content/rating-distribution": {
+        "body": {
+            "keyword": "seo api"
+        }
+    },
+    "content/search": {
+        "body": {
+            "keyword": "seo api",
+            "limit": 3
+        }
+    },
+    "content/sentiment": {
+        "body": {
+            "keyword": "seo api"
+        }
+    },
+    "content/summary": {
+        "body": {
+            "keyword": "seo api"
         }
     },
     "keywords/bing-audience-estimation": {
