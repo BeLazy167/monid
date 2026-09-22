@@ -19,7 +19,7 @@ export default defineEndpoint({
             "postings with title, employer, location, posted time, salary " +
             "when shown, employment type, source site, and apply links, " +
             "plus the job description snippet. Supports depth (10 per " +
-            "page), employment_type, date_posted, and location_radius " +
+            "page), employment_type, and location_radius " +
             "filters. Suited for job market research and recruiting " +
             "intelligence. To find the location_code or exact " +
             "location_name for a city or country, call " +

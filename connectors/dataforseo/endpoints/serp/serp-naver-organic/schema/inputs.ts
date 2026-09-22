@@ -16,7 +16,7 @@ export const zSerpNaverOrganicBody = z.object({
         "Direct URL of the search query",
     ).optional(),
     depth: zDepth(700, 15, 15),
-    max_crawl_pages: z.number().int().max(100).describe(
+    max_crawl_pages: z.number().int().min(1).max(100).describe(
         "Page crawl limit (default 1; max 100)",
     ).optional(),
     device: z.string().min(1).describe(

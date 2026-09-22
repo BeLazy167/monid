@@ -26,7 +26,7 @@ export const zSerpYahooOrganicBody = z.object({
         "Search engine domain (e.g. au.search.yahoo.com)",
     ).optional(),
     depth: zDepth(200, 10, 10),
-    max_crawl_pages: z.number().int().max(100).describe(
+    max_crawl_pages: z.number().int().min(1).max(100).describe(
         "Page crawl limit (default 1; max 100)",
     ).optional(),
     target: z.string().min(1).describe(

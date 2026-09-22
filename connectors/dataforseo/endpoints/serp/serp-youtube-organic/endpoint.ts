@@ -4,8 +4,9 @@ import { zSerpYoutubeOrganicBody } from "./schema/inputs.ts";
 /**
  * YouTube Search Results — `POST /v3/serp/youtube/organic/live/advanced` (v1
  * `/serp/youtube-organic`). Page-billed: $0.002 per page of 20 results; the
- * hold and the count are the results asked for, the vendor's default when
- * omitted (design D4 / D5).
+ * hold and the count are the results asked for (the vendor's knob here is
+ * `block_depth`, not `depth`), the vendor's default when omitted (design D4 /
+ * D5).
  */
 export default defineEndpoint({
     meta: {
@@ -17,8 +18,8 @@ export default defineEndpoint({
             "videos with rank, video_id, title, URL, channel name and id, " +
             "publish date, views, duration, thumbnail, and badges such as " +
             "live or verified, plus shorts and channel blocks. Supports " +
-            "depth (20 per page), device, and block_depth. Suited for " +
-            "video SEO, channel research, and topic monitoring. To find " +
+            "block_depth (20 per page) and device. Suited for video SEO, " +
+            "channel research, and topic monitoring. To find " +
             "the location_code or exact location_name for a city or " +
             "country, call dataforseo#serp/youtube-locations (free lookup " +
             "of YouTube locations; country filter + search).",
@@ -35,7 +36,8 @@ export default defineEndpoint({
     input: {
         schema: {
             body: zSerpYoutubeOrganicBody.extend({
-                depth: zSerpYoutubeOrganicBody.shape.depth.unwrap().default(20),
+                block_depth: zSerpYoutubeOrganicBody.shape.block_depth.unwrap()
+                    .default(20),
             }),
         },
     },
@@ -50,6 +52,8 @@ export default defineEndpoint({
                 "results asked for (depth, or max_crawl_pages pages), " +
                 "billed per page of 20",
         },
-        estimate: ({ data }) => ({ counts: { RESULT: data.input.body.depth } }),
+        estimate: ({ data }) => ({
+            counts: { RESULT: data.input.body.block_depth },
+        }),
     },
 });

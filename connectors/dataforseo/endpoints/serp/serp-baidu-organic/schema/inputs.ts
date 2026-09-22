@@ -13,7 +13,7 @@ export const zSerpBaiduOrganicBody = z.object({
         "Search query, up to 700 characters.",
     ),
     depth: zDepth(700, 10, 10),
-    max_crawl_pages: z.number().int().max(100).describe(
+    max_crawl_pages: z.number().int().min(1).max(100).describe(
         "Page crawl limit (default 1; max 100)",
     ).optional(),
     ...zLocaleFields,

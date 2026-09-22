@@ -258,7 +258,7 @@
     "serp/youtube-organic": {
         "body": {
             "keyword": "seo api",
-            "depth": 20,
+            "block_depth": 20,
             "location_code": 2840,
             "language_code": "en"
         }

@@ -428,9 +428,10 @@ Deno.test("dataforseo docs: one Basic inject, one relay, one digest, one meter, 
     );
     // two poll texts: task_get/advanced/{id} and task_get/{id}
     assertEquals(polls.size, 1);
-    // the estimate texts: depth, depth × crawl pages (per page size),
-    // crawl pages only, limit, one per array field, and the fixed one row
-    assertEquals(estimates.size, 8);
+    // the estimate texts: depth, YouTube's block_depth, depth × crawl pages
+    // (per page size), crawl pages only, limit, one per array field, and the
+    // fixed one row
+    assertEquals(estimates.size, 9);
 });
 
 Deno.test("dataforseo meta: the provider's envelope and blocked-field notes reach every doc; v1's pricing notes ride the docs that had them", async () => {
@@ -486,7 +487,8 @@ Deno.test("dataforseo schemas: strict mirrors, the vendor's default on limit / d
                 assert(prop.description, `${id} ${name}: describe survived`);
                 if (prop.default !== undefined) {
                     assert(
-                        name === "limit" || name === "depth",
+                        name === "limit" || name === "depth" ||
+                            name === "block_depth",
                         `${id} ${name}`,
                     );
                     defaults.push(name);
@@ -495,7 +497,8 @@ Deno.test("dataforseo schemas: strict mirrors, the vendor's default on limit / d
         }
     }
     assertEquals(defaults.filter((n) => n === "limit").length, 1);
-    assertEquals(defaults.filter((n) => n === "depth").length, 15);
+    assertEquals(defaults.filter((n) => n === "depth").length, 14);
+    assertEquals(defaults.filter((n) => n === "block_depth").length, 1);
     // the dictionary query is ours: search and limit optional, country in
     // the path for the per-country lists
     const locations = bundle.endpoints["dataforseo#serp/google-locations"]
@@ -872,6 +875,41 @@ Deno.test("dataforseo: every input schema is strict — an unknown key or a call
         }
         await validates(id, input);
     }
+});
+
+Deno.test("dataforseo floors: max_crawl_pages and block_depth take at least 1 — a 0 or negative page count never reaches the estimate", async () => {
+    const bundle = await testBundle();
+    let seen = 0;
+    for (const id of await dataforseoIds()) {
+        const body = bundle.endpoints[id].input.schema.body as
+            | { properties?: Record<string, unknown> }
+            | undefined;
+        if (body?.properties?.max_crawl_pages === undefined) continue;
+        seen++;
+        const input = inputFor(id);
+        const withPages = (max_crawl_pages: number) => ({
+            ...input,
+            body: { ...(input.body as Record<string, Json>), max_crawl_pages },
+        });
+        await rejects(id, withPages(0));
+        await rejects(id, withPages(-1));
+        await validates(id, withPages(1));
+    }
+    assertEquals(seen, 10);
+    // YouTube: the vendor's knob is block_depth (1-200, default 20); a
+    // `depth` is not a YouTube field and is rejected like any unknown key
+    const youtube = "dataforseo#serp/youtube-organic";
+    const locale = {
+        keyword: "seo api",
+        location_code: 2840,
+        language_code: "en",
+    };
+    const tenPages = await validates(youtube, {
+        body: { ...locale, block_depth: 200 },
+    });
+    assertEquals(tenPages.credits, { default: 0.02 });
+    await rejects(youtube, { body: { ...locale, block_depth: 0 } });
+    await rejects(youtube, { body: { ...locale, depth: 20 } });
 });
 
 Deno.test("dataforseo gates: an omitted limit / depth holds the vendor's default page; the estimate holds pages × price or fee + rows × price", async () => {

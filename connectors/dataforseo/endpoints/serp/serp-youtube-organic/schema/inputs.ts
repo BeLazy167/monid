@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { zDepth, zLocaleFields } from "../../../../schema/common.ts";
+import { zLocaleFields } from "../../../../schema/common.ts";
 
 /**
  * Request body of `POST /v3/serp/youtube/organic/live/advanced` — the vendor's fields as
@@ -13,7 +13,10 @@ export const zSerpYoutubeOrganicBody = z.object({
     keyword: z.string().min(1).max(700).describe(
         "Search query, up to 700 characters.",
     ),
-    depth: zDepth(700, 20, 20),
+    block_depth: z.number().int().min(1).max(200).describe(
+        "Blocks of results to collect (1-200; the vendor's own default is " +
+            "20); billed per page of 20.",
+    ).optional(),
     device: z.enum(["desktop", "mobile"]).describe(
         "Device type (default desktop).",
     ).optional(),

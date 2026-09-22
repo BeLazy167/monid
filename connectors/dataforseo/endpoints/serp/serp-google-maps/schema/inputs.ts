@@ -20,7 +20,7 @@ export const zSerpGoogleMapsBody = z.object({
     os: z.string().min(1).describe(
         "Device operating system (default windows)",
     ).optional(),
-    max_crawl_pages: z.number().int().max(100).describe(
+    max_crawl_pages: z.number().int().min(1).max(100).describe(
         "Page crawl limit (max 100)",
     ).optional(),
     url: z.string().min(1).describe(

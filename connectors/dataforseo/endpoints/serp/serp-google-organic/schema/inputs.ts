@@ -32,7 +32,7 @@ export const zSerpGoogleOrganicBody = z.object({
     match_value: z.string().min(1).describe(
         "Target domain, subdomain, or wildcard value",
     ).optional(),
-    max_crawl_pages: z.number().int().max(100).describe(
+    max_crawl_pages: z.number().int().min(1).max(100).describe(
         "Page crawl limit (max 100)",
     ).optional(),
     search_param: z.string().min(1).describe(
