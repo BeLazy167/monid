@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zQasmBody } from "../../schema/qasm.ts";
 
+/** POST /composer/validate — validate OpenQASM */
 export default defineEndpoint({
     meta: {
         displayName: "Validate OpenQASM",

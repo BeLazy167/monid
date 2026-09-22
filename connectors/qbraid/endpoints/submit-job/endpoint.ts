@@ -1,6 +1,7 @@
 import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
 import { zSubmitJobBody } from "./schema/inputs.ts";
 
+/** POST /jobs — submit job */
 /**
  * `POST /jobs` — THE billable endpoint of the connector.
  *

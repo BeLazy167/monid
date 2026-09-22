@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zListDevicesQueryParams } from "./schema/inputs.ts";
 
+/** GET /devices — list devices */
 export default defineEndpoint({
     meta: {
         displayName: "List Quantum Devices",
@@ -13,7 +14,9 @@ export default defineEndpoint({
             "free-text search; sort and paginate (limit up to 100). Start " +
             "here to pick a target for qbraid#submit-job: the device's " +
             "qrn is the handle every other device and job endpoint takes. " +
-            "This only tells you what exists and is ONLINE — for which QPU " +
+            "Each device carries its current status (ONLINE, OFFLINE, " +
+            "UNAVAILABLE, RETIRED) and, when unavailable, nextAvailable — " +
+            "but status alone says nothing about quality: for which QPU " +
             "or which qubits are actually good right now, read " +
             "qbraid#get-device-calibration. Free.",
         docsUrl: "https://docs.qbraid.com/v2/api-reference",

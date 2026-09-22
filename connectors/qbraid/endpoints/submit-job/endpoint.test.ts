@@ -1,6 +1,8 @@
-import { assert, assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
+import type { Json } from "@shared/core";
 import {
+    assertInputAccepted,
     estimateEndpoint,
     liveSkip,
     loadFixture,
@@ -86,14 +88,51 @@ Deno.test(`${ID} estimate promises nothing — the price is a device fact`, asyn
     assertEquals(usage, { credits: {}, evidence: {} });
 });
 
-Deno.test(`${ID}: program accepts one program or a batch; format is required`, async () => {
+Deno.test(`${ID} schema gate: near-valid bad bodies are INVALID_INPUT, their twins pass`, async () => {
     const unit = await testSealedUnit(ID);
-    const body = unit.doc.input.schema.body as {
-        required?: string[];
-        properties: Record<string, unknown>;
-    };
-    assertEquals(body.required, ["deviceQrn", "shots", "program"]);
-    assert(JSON.stringify(body.properties.program).includes("anyOf"));
+    const fixture = await loadFixture(`${fixturesDir}happy.json`);
+    const program = INPUT.body.program;
+    // `data: null` is NOT in the rejected set: the schema's `.refine` compiles to
+    // nothing (D25 note in schema/inputs.ts), so only a MISSING `data` is
+    // wire-rejected; a null one is the vendor's 400.
+    for (
+        const bad of [
+            { ...INPUT.body, deviceQrn: "" },
+            { ...INPUT.body, shots: -1 },
+            { ...INPUT.body, program: { format: "qasm2" } },
+            { ...INPUT.body, program: [] },
+        ] as Record<string, Json>[]
+    ) {
+        await assertRejects(
+            () =>
+                runEndpoint({
+                    unit,
+                    input: { body: bad },
+                    mode: "replay",
+                    fixture,
+                }),
+            Error,
+            "INVALID_INPUT",
+            JSON.stringify(bad),
+        );
+    }
+    for (
+        const ok of [
+            INPUT.body,
+            {
+                ...INPUT.body,
+                program: { format: "ionq.circuit.v0", data: { qubits: 1 } },
+            },
+            { ...INPUT.body, program: [program, program] },
+        ] as Record<string, Json>[]
+    ) {
+        await assertInputAccepted({
+            unit,
+            input: { body: ok },
+            mode: "replay",
+            fixture,
+        });
+    }
 });
 
 Deno.test({
@@ -111,7 +150,13 @@ Deno.test({
             false,
             JSON.stringify(result.output),
         );
-        // the free simulator quotes 0: the claim prunes, evidence is 0
-        assertEquals(result.usage, { credits: {}, evidence: { CREDIT: 0 } });
+        // shape only: the quote is the vendor's and may change
+        assertEquals(Object.keys(result.usage).sort(), ["credits", "evidence"]);
+        const output = result.output as Record<string, unknown> & {
+            data: Record<string, unknown>;
+        };
+        assertEquals(output.success, true);
+        assertEquals(typeof output.data.jobQrn, "string");
+        assertEquals(typeof output.data.status, "string");
     },
 });

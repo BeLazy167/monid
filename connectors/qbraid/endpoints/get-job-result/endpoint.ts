@@ -2,6 +2,7 @@ import { defineEndpoint } from "@shared/core";
 import { zJobQrnPathParams } from "../../schema/qrn.ts";
 import { zGetJobResultQueryParams } from "./schema/inputs.ts";
 
+/** GET /jobs/{qrn}/result — get job result */
 export default defineEndpoint({
     meta: {
         displayName: "Get Job Result",

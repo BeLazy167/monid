@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zQasmBody } from "../../schema/qasm.ts";
 
+/** POST /composer/parse — parse OpenQASM */
 export default defineEndpoint({
     meta: {
         displayName: "Parse OpenQASM",

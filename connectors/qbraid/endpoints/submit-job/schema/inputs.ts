@@ -1,7 +1,9 @@
 import { z } from "zod";
 
 /** One program — qbraid-api job/shared/validators.ts
- *  `ProgramValidationSchema`: `format` free-form, `data` any non-null. */
+ *  `ProgramValidationSchema`: `format` free-form, `data` any non-null (the
+ *  refine mirrors `v.check(val !== null && val !== undefined)`; it compiles
+ *  to nothing, so `required` is the wire-enforced half). */
 const zProgram = z.object({
     format: z.string().min(1).describe(
         "Program format — must be one of the device's runInputTypes from " +
@@ -9,7 +11,7 @@ const zProgram = z.object({
             "ionq.circuit.v0, pulser.sequence, analog, problem, braket, " +
             "pyqir.",
     ),
-    data: z.union([z.string().min(1), z.record(z.string(), z.unknown())])
+    data: z.unknown().refine((value) => value !== null && value !== undefined)
         .describe(
             "The program: source text for text formats (OpenQASM, Quil, " +
                 "QIR), a JSON object for structured ones (ionq.circuit.v0, " +
