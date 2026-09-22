@@ -1,6 +1,7 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
+    assertInputAccepted,
     liveSkip,
     loadFixture,
     runEndpoint,
@@ -58,8 +59,30 @@ Deno.test(`${ID}: a simulator has no calibration — 404 is data`, async () => {
     assertEquals((result.output as Record<string, unknown>).code, "NOT_FOUND");
 });
 
+Deno.test(`${ID} schema gate: a near-valid bad input is INVALID_INPUT, its twin passes`, async () => {
+    const unit = await testSealedUnit(ID);
+    const fixture = await loadFixture(`${fixturesDir}happy.json`);
+    await assertRejects(
+        () =>
+            runEndpoint({
+                unit,
+                input: { pathParams: { qrn: "" } },
+                mode: "replay",
+                fixture,
+            }),
+        Error,
+        "INVALID_INPUT",
+    );
+    await assertInputAccepted({
+        unit,
+        input: { pathParams: { qrn: "aws:aqt:qpu:ibex-q1" } },
+        mode: "replay",
+        fixture,
+    });
+});
+
 Deno.test({
-    name: `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY)`,
+    name: `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY): response shape`,
     ignore: liveSkip("qbraid"),
     fn: async () => {
         const result = await runEndpoint({
@@ -73,5 +96,8 @@ Deno.test({
             JSON.stringify(result.output),
         );
         assertEquals(result.usage, { credits: {}, evidence: {} });
+        const output = result.output as Record<string, unknown>;
+        assertEquals(typeof output.message, "string");
+        assertEquals(typeof output.code, "string");
     },
 });

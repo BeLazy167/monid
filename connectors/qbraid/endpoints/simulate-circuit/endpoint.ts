@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zQasmBody } from "../../schema/qasm.ts";
 
+/** POST /composer/simulate — simulate circuit */
 export default defineEndpoint({
     meta: {
         displayName: "Simulate Circuit",

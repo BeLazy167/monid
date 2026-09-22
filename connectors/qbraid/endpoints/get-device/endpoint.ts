@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zDeviceQrnPathParams } from "../../schema/qrn.ts";
 
+/** GET /devices/{qrn} — get device */
 export default defineEndpoint({
     meta: {
         displayName: "Get Quantum Device",

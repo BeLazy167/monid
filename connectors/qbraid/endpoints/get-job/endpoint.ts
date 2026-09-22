@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zJobQrnPathParams } from "../../schema/qrn.ts";
 
+/** GET /jobs/{qrn} — get job */
 export default defineEndpoint({
     meta: {
         displayName: "Get Job",

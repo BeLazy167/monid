@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zConvertQasmBody } from "./schema/inputs.ts";
 
+/** POST /composer/convert — convert OpenQASM version */
 export default defineEndpoint({
     meta: {
         displayName: "Convert OpenQASM Version",

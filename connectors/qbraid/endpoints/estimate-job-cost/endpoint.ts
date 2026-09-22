@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zEstimateJobCostQueryParams } from "./schema/inputs.ts";
 
+/** GET /jobs/cost-estimate — estimate job cost */
 export default defineEndpoint({
     meta: {
         displayName: "Estimate Job Cost",

@@ -1,6 +1,7 @@
-import { assertEquals } from "@std/assert";
+import { assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import {
+    assertInputAccepted,
     liveSkip,
     loadFixture,
     runEndpoint,
@@ -50,8 +51,30 @@ Deno.test(`${ID} provider error: 401 is data, zero usage, digested`, async () =>
     assertEquals(output.code, "INVALID_API_KEY_FORMAT");
 });
 
+Deno.test(`${ID} schema gate: a near-valid bad input is INVALID_INPUT, its twin passes`, async () => {
+    const unit = await testSealedUnit(ID);
+    const fixture = await loadFixture(`${fixturesDir}happy.json`);
+    await assertRejects(
+        () =>
+            runEndpoint({
+                unit,
+                input: { body: { qasm: "" } },
+                mode: "replay",
+                fixture,
+            }),
+        Error,
+        "INVALID_INPUT",
+    );
+    await assertInputAccepted({
+        unit,
+        input: INPUT,
+        mode: "replay",
+        fixture,
+    });
+});
+
 Deno.test({
-    name: `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY)`,
+    name: `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY): response shape`,
     ignore: liveSkip("qbraid"),
     fn: async () => {
         const result = await runEndpoint({
@@ -65,5 +88,11 @@ Deno.test({
             JSON.stringify(result.output),
         );
         assertEquals(result.usage, { credits: {}, evidence: {} });
+        const output = result.output as Record<string, unknown> & {
+            data: Record<string, unknown>;
+        };
+        assertEquals(output.success, true);
+        assertEquals(typeof output.data.probabilities, "object");
+        assertEquals(typeof output.data.num_qubits, "number");
     },
 });

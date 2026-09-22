@@ -1,5 +1,6 @@
 import { defineEndpoint } from "@shared/core";
 
+/** GET /providers — list providers */
 export default defineEndpoint({
     meta: {
         displayName: "List Quantum Providers",

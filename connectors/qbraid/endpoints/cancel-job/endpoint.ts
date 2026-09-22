@@ -1,6 +1,7 @@
 import { defineEndpoint } from "@shared/core";
 import { zJobQrnPathParams } from "../../schema/qrn.ts";
 
+/** POST /jobs/{qrn}/cancel — cancel job */
 export default defineEndpoint({
     meta: {
         displayName: "Cancel Job",
