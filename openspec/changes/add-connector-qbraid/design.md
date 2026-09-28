@@ -108,6 +108,12 @@ listed for completeness and is not a key probe.
   upstream `v.check`. A refine compiles to nothing in the JSON Schema,
   so only a missing `data` is rejected before the wire; `data: null`
   reaches qBraid and is its 400.
+- The `submit-job` binding omits `groupJobQrn` and is `.strict()`. The
+  schema file still mirrors the vendor field. Under the shared key a
+  caller-chosen group QRN could attach jobs to another caller's group,
+  for the same reason as D9. `.strict()` compiles to
+  `additionalProperties: false`, so an unknown key cannot carry it past
+  the binding either.
 
 Shared fragments live in `connectors/qbraid/schema/`: `zQasmBody` and
 the device QRN path param.

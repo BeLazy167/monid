@@ -155,6 +155,13 @@ Deno.test(`${ID} schema gate: near-valid bad bodies are INVALID_INPUT, their twi
             { ...INPUT.body, shots: -1 },
             { ...INPUT.body, program: { format: "qasm2" } },
             { ...INPUT.body, program: [] },
+            // shared key: a caller-chosen group QRN is refused, as is any
+            // unknown key (the binding is `.strict()`)
+            {
+                ...INPUT.body,
+                groupJobQrn: "qbraid:qbraid:sim:qir-sv-32de-qgroup-0",
+            },
+            { ...INPUT.body, unexpected: true },
         ] as Record<string, Json>[]
     ) {
         await assertRejects(

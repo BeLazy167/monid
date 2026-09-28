@@ -81,7 +81,15 @@ export default defineEndpoint({
     },
     endpoint: "/submit-job",
     request: { method: "POST", path: "/jobs" },
-    input: { schema: { body: zSubmitJobBody } },
+    input: {
+        schema: {
+            // Every Monid caller shares one qBraid key, so a caller-supplied
+            // group QRN could attach jobs to another caller's group (QRNs are
+            // guessable). The binding omits it, and `.strict()` rejects any
+            // unknown key before the wire so it cannot ride through either.
+            body: zSubmitJobBody.omit({ groupJobQrn: true }).strict(),
+        },
+    },
     timeouts: { requestMs: 60_000, runMs: 1_800_000, pollMs: 5_000 },
     usage: {
         model: {
@@ -194,7 +202,6 @@ export default defineEndpoint({
                     "$.provider",
                     "$.deviceQrn",
                     "$.device",
-                    "$.groupJobQrn",
                     "$.tags",
                     "$.runtimeOptions",
                     "$.createdAt",
