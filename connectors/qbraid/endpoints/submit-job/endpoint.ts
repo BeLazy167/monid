@@ -1,63 +1,71 @@
 import { defineEndpoint, Unit, UsageModelKind } from "@shared/core";
 import { zSubmitJobBody } from "./schema/inputs.ts";
 
-/** POST /jobs — submit job */
 /**
- * `POST /jobs` — THE billable endpoint of the connector.
+ * `POST /jobs` — THE billable endpoint of the connector, run as an ASYNC
+ * job (design D9): submit, poll to a terminal status, read the result, all
+ * inside one run. The job QRN lives in `state.externalRunId` and never
+ * reaches the caller — Monid holds ONE qBraid key, qBraid QRNs are
+ * guessable, so a QRN-addressed read or cancel would reach other callers'
+ * jobs. The output allowlists the job's fields, so `jobQrn` stays
+ * inside too.
  *
- * Cost = the job's `data.estimatedCost` on the 201 envelope, in qBraid
- * credits (qbraid-runtime-api jobs_create.py prices it from the device's
- * perTask/perShot/perMinute card and writes it on the created job;
- * qbraid-api's toPublicJob allowlists it through). That figure is the
- * VENDOR'S OWN claim (design D27): `usage.consolidate` plucks it out of the
- * payload and it settles the run; `usage.evidence` restates it as the
- * metered quantity so the derived fold agrees to the credit.
+ *   start → `POST /jobs`            RUNNING{externalRunId: jobQrn}
+ *   poll  → `GET  /jobs/{qrn}`      RUNNING until COMPLETED/FAILED/CANCELLED
+ *           `GET  /jobs/{qrn}/result` on COMPLETED → `{job, result}`
+ *   stop  → `POST /jobs/{qrn}/cancel` best effort
  *
- * Why the line is metered in MILLIONTHS of a credit: the engine folds
- * `ceil(quantity / every) × amount`, and qBraid quotes fractional credits
- * rounded to 6 decimals (qbraid-api number-utils CREDIT_PRECISION_DECIMALS)
- * — a count in whole credits would ceil 2.35 to 3 and ride out as a
- * mismatch on every priced job. `round(estimatedCost × 1e6)` at
- * `amount: 0.000001` folds exactly.
+ * Terminal statuses are qbraid-api's `QuantumJobStatusReturned`
+ * (job/shared/types.ts): COMPLETED, FAILED, CANCELLED. Everything else —
+ * INITIALIZING, QUEUED, VALIDATING, RUNNING, CANCELLING, HOLD, UNKNOWN, or
+ * a status we do not know — stays RUNNING, bounded by `runMs`. Reading a
+ * non-terminal job is also what makes qbraid-api refresh it from the
+ * device vendor, so the poll drives the job forward.
  *
- * `usage.estimate` promises NOTHING (`{counts: {}}`, 0 credits): the price
- * is a device fact (per-task + per-shot + per-minute rates) that the input
- * alone cannot yield, and the estimate hook does no IO. Callers price a job
- * with `qbraid#estimate-job-cost` first — the description says so.
+ * BILLING (design D10): settle on the terminal `job.cost` — the FINAL
+ * charge. qBraid escrows `estimatedCost` at submit and settles `cost` at the
+ * terminal status (worker-service escrow-settle: COMPLETED charges `cost`,
+ * FAILED/CANCELLED refund the whole escrow). Counted in MILLIONTHS of a
+ * credit because qBraid rounds credits to 6 decimals and the engine ceils
+ * each line: `round(cost × 1e6)` at `amount: 0.000001` folds exactly.
+ * FAILED/CANCELLED runs settle as synthesized 500s, which the engine
+ * zero-bills — matching qBraid's full refund.
  *
- * `lifecycle.start`: qbraid-api answers 201 even when the submission was
- * rejected (`{success: false, data: {}}` — controller `newJob.success ||
- * false`). A declarative doc cannot turn that into a non-2xx, so the start
- * relays the request and synthesizes a 502 for a 2xx whose `success` is not
- * `true` (the minimax posture) — the engine then zero-bills it.
+ * Poll errors THROW (the kling D7 posture): a failed status GET says
+ * nothing about the job, which may still be running and billing on a QPU.
+ * The host retries the tick; `runMs` bounds it, and on expiry the engine
+ * calls `stop` (cancel) before it fails the run with TIMEOUT.
  */
 export default defineEndpoint({
     meta: {
-        displayName: "Submit Quantum Job",
-        summary: "Run a program on a QPU or simulator — spends qBraid credits.",
-        description: "Submit a quantum program to run on a quantum device " +
-            "or simulator. THIS SPENDS qBraid CREDITS: the job's estimated " +
-            "cost (scaling with shots and the device's perTask / perShot / " +
-            "perMinute pricing; 100 credits = $1 USD) is charged when the " +
-            "platform accepts it and is not refundable once the device " +
-            "takes the job. Call qbraid#estimate-job-cost with the same " +
-            "deviceQrn and shots first and confirm the number with the " +
-            "user; the qbraid:qbraid:sim:qir-sv simulator is free. " +
-            "program is {format, data}: format must be one of the " +
-            "device's runInputTypes from qbraid#get-device (qasm2, qasm3, " +
-            "quil, qir.ll, ionq.circuit.v0, …) and data the program " +
-            "source; an array of programs submits one batch job of up to " +
-            "2000 circuits. Validate OpenQASM with qbraid#validate-qasm " +
-            "first — a malformed program wastes credits and queue " +
-            "position — and preview circuits of up to 20 qubits for free " +
-            "with qbraid#simulate-circuit. Returns the created job " +
-            "(jobQrn, status INITIALIZING, shots, deviceQrn); the charged " +
-            "amount is reported as this run's usage in qBraid credits. " +
-            "Poll qbraid#get-job until the status is terminal, then read " +
-            "qbraid#get-job-result. A submission the platform rejects " +
-            "(device not found, insufficient credits, unsupported format) " +
-            "settles as a provider error and bills nothing. Suited to " +
-            "simple circuits — Bell, GHZ, small Grover — or when the user " +
+        displayName: "Run Quantum Job",
+        summary: "Run a program on a QPU or simulator and return its " +
+            "measurement results — spends qBraid credits.",
+        description: "Run a quantum program on a quantum device or " +
+            "simulator and wait for its measurement results. THIS SPENDS " +
+            "qBraid CREDITS: the job's final cost (scaling with shots and " +
+            "the device's perTask / perShot / perMinute pricing; 100 " +
+            "credits = $1 USD) is this run's usage. Call " +
+            "qbraid#estimate-job-cost with the same deviceQrn and shots " +
+            "first and confirm the number with the user. The free " +
+            "simulator qbraid:qbraid:sim:qir-sv returns in seconds; a QPU " +
+            "job waits in the device's queue, and a queue longer than 30 " +
+            "minutes ends the run and cancels the job. program is " +
+            "{format, data}: format must be one of the device's " +
+            "runInputTypes from qbraid#get-device (qasm2, qasm3, quil, " +
+            "qir.ll, ionq.circuit.v0, …) and data the program source; an " +
+            "array of programs submits one batch job of up to 2000 " +
+            "circuits. Validate OpenQASM with qbraid#validate-qasm first — " +
+            "a malformed program wastes queue time — and preview circuits " +
+            "of up to 20 qubits for free with qbraid#simulate-circuit. " +
+            "Returns {job, result}: job is the finished job (status, " +
+            "shots, estimatedCost, timeStamps, device) and result carries " +
+            "resultData.measurementCounts, the histogram over bitstrings. " +
+            "A submission the platform rejects (device not found, " +
+            "insufficient credits, unsupported format), or a job that " +
+            "fails or is cancelled, settles as a provider error carrying " +
+            "the job's statusMsg and bills nothing. Suited to simple " +
+            "circuits — Bell, GHZ, small Grover — or when the user " +
             "supplies program code directly; circuits that need Python " +
             "generation belong in the qBraid SDK.",
         docsUrl: "https://docs.qbraid.com/v2/api-reference",
@@ -66,52 +74,52 @@ export default defineEndpoint({
             "The usage estimate is always 0: the price depends on the " +
             "device's rate card, which the input alone cannot yield. " +
             "qbraid#estimate-job-cost is the quote.",
+            "A run lasts at most 30 minutes. A job still queued or running " +
+            "then is cancelled upstream and the run fails with a timeout; " +
+            "qBraid refunds cancelled jobs.",
         ],
     },
     endpoint: "/submit-job",
     request: { method: "POST", path: "/jobs" },
     input: { schema: { body: zSubmitJobBody } },
-    timeouts: { requestMs: 60_000, runMs: 90_000 },
+    timeouts: { requestMs: 60_000, runMs: 1_800_000, pollMs: 5_000 },
     usage: {
         model: {
             kind: UsageModelKind.PER_UNIT,
             unit: Unit.CREDIT,
             consumes: { credit: "default", amount: 0.000001 },
             label: "job cost",
-            description: "the job's estimatedCost, counted in millionths " +
+            description: "the finished job's cost, counted in millionths " +
                 "of a qBraid credit (qBraid rounds credits to 6 decimals)",
         },
         /** Not deducible from the input (see the file comment). */
         estimate: () => ({ counts: {} }),
-        /** The claim restated as the metered quantity — settle-side twin
-         *  of the (empty) estimate. Absent field ⇒ no count. */
+        /** The final cost restated as the metered quantity — settle-side
+         *  twin of the (empty) estimate. Absent field ⇒ no count. */
         evidence: ({ data, utils }) => {
-            const cost = utils.json.optionalNum(
-                data.output,
-                "$.data.estimatedCost",
-            );
+            const cost = utils.json.optionalGet(data.output, "$.job.cost");
             return {
                 counts: {
-                    ...(cost !== undefined
+                    ...(typeof cost === "number"
                         ? { CREDIT: Math.round(cost * 1_000_000) }
                         : {}),
                 },
             };
         },
-        /** The vendor's OWN claim (design D27), plucked out of the
-         *  payload in one motion — the receipt lives in usage.credits,
-         *  not twice. Zero claims prune (the free simulator bills
-         *  nothing); an absent field falls back to the derived fold. */
+        /** The vendor's OWN charge (design D27), plucked out of the payload
+         *  — the receipt lives in usage.credits, not twice. The result
+         *  route repeats it as a decimal string ("0E-33"); that copy leaves
+         *  too. Zero claims prune (the free simulator bills nothing). */
         consolidate: ({ data, utils }) => {
             const { value, rest } = utils.json.pluck(
                 data.output,
-                "$.data.estimatedCost",
+                "$.job.cost",
             );
             return {
                 credits: {
                     ...(typeof value === "number" ? { default: value } : {}),
                 },
-                output: rest,
+                output: utils.json.pluck(rest, "$.result.cost").rest,
             };
         },
     },
@@ -128,12 +136,14 @@ export default defineEndpoint({
             // 201 + success:false = rejected submission (qbraid-api
             // createJob answers 201 regardless). Nothing was queued; the
             // synthesized 502 keeps it out of the billing gate.
-            if (utils.json.optionalGet(res.body, "$.success") !== true) {
+            const jobQrn = utils.json.optionalGet(res.body, "$.data.jobQrn");
+            if (
+                utils.json.optionalGet(res.body, "$.success") !== true ||
+                typeof jobQrn !== "string" || jobQrn === ""
+            ) {
                 logger.warn(
                     "qbraid 2xx without success:true — synthesizing 502",
-                    {
-                        status: res.status,
-                    },
+                    { status: res.status },
                 );
                 return {
                     kind: "COMPLETED",
@@ -142,11 +152,133 @@ export default defineEndpoint({
                     output: res.body,
                 };
             }
+            return { kind: "RUNNING", state: { externalRunId: jobQrn } };
+        },
+        poll: async ({ data, utils, logger }) => {
+            const qrn = data.lifecycle.state.externalRunId;
+            if (qrn === undefined) {
+                throw Object.assign(
+                    new Error("qbraid poll without externalRunId in state"),
+                    { retriable: false },
+                );
+            }
+            const jobUrl = data.request.url + "/" + encodeURIComponent(qrn);
+            const res = await utils.http({ method: "GET", url: jobUrl });
+            if (
+                res.status < 200 || res.status >= 300 ||
+                utils.json.optionalGet(res.body, "$.success") !== true
+            ) {
+                // our status READ failed, not the job — it may still be
+                // running on a device. Retriable; runMs bounds it.
+                throw new Error(
+                    "qBraid job read returned " + String(res.status),
+                );
+            }
+            // ALLOWLIST the job facts a caller acts on. Withheld: jobQrn
+            // (the handle this doc keeps private) and qbraid-api's four
+            // SDK-contract fields — our account's Mongo ids and a storage
+            // path that embeds the QRN.
+            const job = utils.json.pick(
+                utils.json.get(res.body, "$.data"),
+                [
+                    "$.name",
+                    "$.status",
+                    "$.statusMsg",
+                    "$.shots",
+                    "$.numCircuits",
+                    "$.cost",
+                    "$.estimatedCost",
+                    "$.experimentType",
+                    "$.queuePosition",
+                    "$.vendor",
+                    "$.provider",
+                    "$.deviceQrn",
+                    "$.device",
+                    "$.groupJobQrn",
+                    "$.tags",
+                    "$.runtimeOptions",
+                    "$.createdAt",
+                    "$.updatedAt",
+                    "$.timeStamps",
+                ],
+            );
+            const status = utils.json.optionalGet(job, "$.status");
+            if (status === "FAILED" || status === "CANCELLED") {
+                const statusMsg = utils.json.optionalGet(job, "$.statusMsg");
+                logger.warn("qbraid job did not complete", {
+                    status: String(status),
+                });
+                // shaped like qBraid's own error envelope so the provider
+                // fromError digests message + code
+                return {
+                    kind: "COMPLETED",
+                    httpStatus: 500,
+                    providerHttpStatus: res.status,
+                    output: {
+                        success: false,
+                        message: typeof statusMsg === "string" &&
+                                statusMsg !== ""
+                            ? statusMsg
+                            : "qBraid job " + String(status),
+                        error: { code: "JOB_" + String(status) },
+                        job,
+                    },
+                };
+            }
+            if (status !== "COMPLETED") {
+                return {
+                    kind: "RUNNING",
+                    state: {
+                        externalRunId: qrn,
+                        ...(typeof status === "string"
+                            ? { stage: status }
+                            : {}),
+                    },
+                };
+            }
+            const result = await utils.http({
+                method: "GET",
+                url: jobUrl + "/result",
+            });
+            if (
+                result.status < 200 || result.status >= 300 ||
+                utils.json.optionalGet(result.body, "$.success") !== true
+            ) {
+                // the job finished but its result is not readable yet —
+                // retry the tick rather than ship a job without results
+                throw new Error(
+                    "qBraid job result read returned " + String(result.status),
+                );
+            }
             return {
                 kind: "COMPLETED",
-                httpStatus: res.status,
-                output: res.body,
+                httpStatus: 200,
+                providerHttpStatus: result.status,
+                output: utils.json.merge({ job }, {
+                    result: utils.json.get(result.body, "$.data"),
+                }),
             };
+        },
+        stop: async ({ data, utils, logger }) => {
+            const qrn = data.lifecycle.state.externalRunId;
+            if (qrn === undefined) {
+                throw Object.assign(
+                    new Error("qbraid stop without externalRunId in state"),
+                    { retriable: false },
+                );
+            }
+            const res = await utils.http({
+                method: "POST",
+                url: data.request.url + "/" + encodeURIComponent(qrn) +
+                    "/cancel",
+            });
+            if (res.status < 200 || res.status >= 300) {
+                // best effort: 409 JOB_CANCEL_CONFLICT (still initializing)
+                // or an already-terminal job leaves nothing to stop
+                logger.warn("qbraid job cancel failed (ignored)", {
+                    status: res.status,
+                });
+            }
         },
     },
 });

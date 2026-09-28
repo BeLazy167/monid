@@ -7,11 +7,3 @@ export const zDeviceQrnPathParams = z.object({
             "qbraid#list-devices).",
     ),
 });
-
-/** `{qrn}` path parameter of the job routes. */
-export const zJobQrnPathParams = z.object({
-    qrn: z.string().min(1).describe(
-        "Job QRN, e.g. aws:aws:sim:sv1-1234-qjob-abc123 (the jobQrn " +
-            "returned by qbraid#submit-job).",
-    ),
-});

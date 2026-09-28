@@ -7,13 +7,12 @@ import { defineProvider, presets, UsageModelKind } from "@shared/core";
  * request schemas from `src/features/{device,composer,job}/validators.ts`,
  * response shapes from the controllers and `job/shared/serializers/*`.
  *
- * Twelve endpoints are FREE (device/provider reads, OpenQASM tooling, the
- * 20-qubit simulator, cost estimate, job reads and cancel) — the provider
- * states FREE as the default model. ONE endpoint bills: `#submit-job`,
- * which overrides the model and carries its own settle fns, because the
- * vendor's cost claim (`data.estimatedCost`) also rides every job READ —
- * a provider-level consolidate would re-bill a job on `#get-job` (the
- * firecrawl job-read trap).
+ * Nine endpoints are FREE (device/provider reads, OpenQASM tooling, the
+ * 20-qubit simulator, cost estimate) — the provider states FREE as the
+ * default model. ONE endpoint bills: `#submit-job`, an async run that owns
+ * the job from submit to result and carries its own model, settle fns and
+ * lifecycle. There are no job-read or cancel endpoints: under one shared
+ * API key a caller-supplied job QRN would reach any caller's job.
  *
  * Every response is an envelope: `{success: true, data}` (some routes add
  * `meta.timestamp`) or `{success: false, message, error: {code, …}}`.
@@ -31,7 +30,7 @@ export default defineProvider({
             "across AWS Braket, Azure Quantum, IBM, IonQ and qBraid's own " +
             "backends. List devices and their live calibration, validate, " +
             "parse, convert and simulate OpenQASM for free, price a run, " +
-            "then submit, track, read and cancel jobs. Pay-as-you-go in " +
+            "then run a job to its result in one call. Pay-as-you-go in " +
             "qBraid credits (100 credits = $1 USD).",
         homepageUrl: "https://www.qbraid.com",
         docsUrl: "https://docs.qbraid.com/v2/api-reference",
@@ -47,7 +46,7 @@ export default defineProvider({
     request: { baseUrl: "https://api-v2.qbraid.com/api/v1" },
     timeouts: { requestMs: 30_000, runMs: 60_000 },
     usage: {
-        /** The default: twelve of thirteen endpoints never bill. */
+        /** The default: nine of ten endpoints never bill. */
         model: { kind: UsageModelKind.FREE },
         /** THE credit system (design D26): qBraid meters in its own
          *  credits — 100 credits = $1 USD (qbraid-api

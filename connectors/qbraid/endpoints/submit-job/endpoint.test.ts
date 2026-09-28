@@ -1,10 +1,11 @@
-import { assertEquals, assertRejects } from "@std/assert";
+import { assert, assertEquals, assertRejects } from "@std/assert";
 import { fromFileUrl } from "@std/path";
 import type { Json } from "@shared/core";
 import {
     assertInputAccepted,
     estimateEndpoint,
     liveSkip,
+    loadEndpoint,
     loadFixture,
     runEndpoint,
     testSealedUnit,
@@ -31,27 +32,41 @@ const run = async (fixture: string, input = INPUT) =>
         fixture: await loadFixture(`${fixturesDir}${fixture}.json`),
     });
 
-Deno.test(`${ID} happy (recorded): free simulator — zero claim prunes, receipt consolidated away`, async () => {
-    const result = await run("happy");
-    assertEquals(result.httpStatus, 201);
-    assertEquals(result.isProviderError, false);
-    // claim 0 (D27: zero entries prune) + evidence CREDIT 0
-    assertEquals(result.usage, { credits: {}, evidence: { CREDIT: 0 } });
-    const output = result.output as Record<string, unknown> & {
-        data: Record<string, unknown>;
+type Out = {
+    job: Record<string, unknown>;
+    result: Record<string, unknown> & {
+        resultData: { measurementCounts: Record<string, number> };
     };
-    assertEquals(output.success, true);
-    assertEquals(output.data.status, "INITIALIZING");
-    assertEquals(typeof output.data.jobQrn, "string");
-    // the receipt left the payload — it lives in usage.credits
-    assertEquals("estimatedCost" in output.data, false);
+};
+
+Deno.test(`${ID} happy (recorded): submit → QUEUED → COMPLETED → result, ONE output`, async () => {
+    const result = await run("happy");
+    assertEquals(result.httpStatus, 200);
+    assertEquals(result.isProviderError, false);
+    // final cost 0 (D27: zero entries prune) + evidence CREDIT 0
+    assertEquals(result.usage, { credits: {}, evidence: { CREDIT: 0 } });
+    const output = result.output as Out;
+    assertEquals(Object.keys(output).sort(), ["job", "result"]);
+    assertEquals(output.job.status, "COMPLETED");
+    assertEquals(output.result.resultData.measurementCounts, {
+        "11": 4,
+        "00": 6,
+    });
+    // the receipt left the payload — both copies; the quote stays
+    assertEquals("cost" in output.job, false);
+    assertEquals("cost" in output.result, false);
+    assertEquals(output.job.estimatedCost, 0);
+    // the handle and the account's internals never reach the caller
+    for (const key of ["jobQrn", "organizationUserId", "gcsDestination"]) {
+        assertEquals(key in output.job, false, key);
+    }
 });
 
-Deno.test(`${ID} priced: the vendor's estimatedCost claim wins, fold agrees exactly`, async () => {
+Deno.test(`${ID} priced: the final cost claim wins, fold agrees exactly`, async () => {
     const result = await run("synthetic-priced", {
         body: { ...INPUT.body, deviceQrn: "aws:aqt:qpu:ibex-q1", shots: 100 },
     });
-    assertEquals(result.httpStatus, 201);
+    assertEquals(result.httpStatus, 200);
     // 265 credits claimed; 265 000 000 millionths × 0.000001 folds to 265
     // within 1e-9, so NO mismatch key rides out (zUsage is strict)
     assertEquals(result.usage, {
@@ -67,6 +82,45 @@ Deno.test(`${ID}: 201 + success:false becomes a 502 and bills NOTHING`, async ()
     assertEquals(result.isProviderError, true);
     assertEquals(result.usage, { credits: {}, evidence: {} });
 });
+
+Deno.test(`${ID} failed job (recorded): synthesized 500 carries the statusMsg, bills nothing`, async () => {
+    const result = await run("failed");
+    assertEquals(result.httpStatus, 500);
+    assertEquals(result.providerHttpStatus, 200);
+    assertEquals(result.isProviderError, true);
+    assertEquals(result.usage, { credits: {}, evidence: {} });
+    const output = result.output as {
+        message: string;
+        code: string;
+        raw: { job: Record<string, unknown> };
+    };
+    assertEquals(output.code, "JOB_FAILED");
+    assert(output.message.includes("Missing register declaration"));
+    assertEquals("jobQrn" in output.raw.job, false);
+});
+
+for (
+    const [fixture, cancelStatus] of [
+        ["stop-conflict", 409],
+        ["synthetic-stop", 202],
+    ] as const
+) {
+    Deno.test(`${ID} stop (${fixture}): cancel is best effort — ${cancelStatus} settles nothing`, async () => {
+        const loaded = await loadEndpoint({
+            unit: await testSealedUnit(ID),
+            input: INPUT,
+            mode: "replay",
+            fixture: await loadFixture(`${fixturesDir}${fixture}.json`),
+        });
+        const started = await loaded.start(INPUT);
+        assert(started.kind === "RUNNING");
+        assert(started.state.externalRunId?.includes("-qjob-"));
+        // the replay fails loudly unless stop POSTs .../{qrn}/cancel
+        assertEquals(await loaded.stop(INPUT, started.state), {
+            kind: "STOPPED_UNSETTLED",
+        });
+    });
+}
 
 for (
     const [fixture, status, code] of [
@@ -137,7 +191,7 @@ Deno.test(`${ID} schema gate: near-valid bad bodies are INVALID_INPUT, their twi
 
 Deno.test({
     name:
-        `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY): 10 free shots on the QIR simulator`,
+        `${ID} live (gated on QBRAID_CREDENTIALS_API_KEY): 10 free shots on the QIR simulator, run to its result`,
     ignore: liveSkip("qbraid"),
     fn: async () => {
         const result = await runEndpoint({
@@ -150,13 +204,13 @@ Deno.test({
             false,
             JSON.stringify(result.output),
         );
-        // shape only: the quote is the vendor's and may change
+        // shape only: the cost is the vendor's and may change
         assertEquals(Object.keys(result.usage).sort(), ["credits", "evidence"]);
-        const output = result.output as Record<string, unknown> & {
-            data: Record<string, unknown>;
-        };
-        assertEquals(output.success, true);
-        assertEquals(typeof output.data.jobQrn, "string");
-        assertEquals(typeof output.data.status, "string");
+        const output = result.output as Out;
+        assertEquals(output.job.status, "COMPLETED");
+        assertEquals(
+            typeof output.result.resultData.measurementCounts,
+            "object",
+        );
     },
 });

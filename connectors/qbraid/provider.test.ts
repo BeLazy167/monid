@@ -11,13 +11,12 @@ import {
 const HERE = fromFileUrl(new URL("./", import.meta.url));
 const BELL =
     'OPENQASM 2.0;\ninclude "qelib1.inc";\nqreg q[2];\ncreg c[2];\nh q[0];\ncx q[0],q[1];\nmeasure q -> c;\n';
-const JOB = "qbraid:qbraid:sim:qir-sv-32de-qjob-6ab2125ea32f8043c5e8e9d9";
 
 /**
  * qBraid's rate card as each endpoint's happy fixture settles it — LITERALS
  * on purpose (deriving them from the docs' own models would make this a
- * tautology). Twelve endpoints are free; `#submit-job` bills the vendor's
- * own estimatedCost claim, and the recorded happy run is the free simulator
+ * tautology). Nine endpoints are free; `#submit-job` bills the finished
+ * job's own cost claim, and the recorded happy run is the free simulator
  * (claim 0 prunes — the priced arithmetic is pinned in the endpoint test).
  * A new endpoint must state its row here.
  */
@@ -68,20 +67,6 @@ const RATE: Record<
         },
         usage: { credits: {}, evidence: {} },
     },
-    "qbraid#get-job": {
-        input: { pathParams: { qrn: JOB } },
-        usage: { credits: {}, evidence: {} },
-    },
-    "qbraid#get-job-result": {
-        input: { pathParams: { qrn: JOB } },
-        usage: { credits: {}, evidence: {} },
-    },
-    "qbraid#cancel-job": {
-        input: { pathParams: { qrn: JOB } },
-        fixture: "synthetic-happy",
-        status: 202,
-        usage: { credits: {}, evidence: {} },
-    },
     "qbraid#submit-job": {
         input: {
             body: {
@@ -90,7 +75,6 @@ const RATE: Record<
                 program: { format: "qasm2", data: BELL },
             },
         },
-        status: 201,
         usage: { credits: {}, evidence: { CREDIT: 0 } },
     },
 };
@@ -104,7 +88,7 @@ const qbraidIds = async (): Promise<string[]> => {
 
 Deno.test("qbraid: the literal rate table covers exactly the compiled endpoints", async () => {
     const ids = await qbraidIds();
-    assertEquals(ids.length, 13);
+    assertEquals(ids.length, 10);
     assertEquals(ids, Object.keys(RATE).sort());
 });
 
@@ -128,7 +112,7 @@ Deno.test("qbraid: every endpoint's happy run settles its row", async () => {
     }
 });
 
-Deno.test("qbraid: fn provenance — one auth, one fromError, ONE pool; only submit-job meters, consolidates and runs a lifecycle", async () => {
+Deno.test("qbraid: fn provenance — one auth, one fromError, ONE pool; only submit-job meters, consolidates and owns start/poll/stop", async () => {
     const bundle = await testBundle();
     const ids = await qbraidIds();
     const first = bundle.endpoints[ids[0]];
@@ -151,7 +135,10 @@ Deno.test("qbraid: fn provenance — one auth, one fromError, ONE pool; only sub
         );
         assertEquals(doc.usage.model.kind, billed ? "PER_UNIT" : "FREE", id);
         assertEquals(doc.usage.consolidate !== undefined, billed, id);
-        assertEquals(doc.lifecycle !== undefined, billed, id);
+        // the async run: the job QRN is held in state, never an input
+        assertEquals(doc.lifecycle?.start !== undefined, billed, id);
+        assertEquals(doc.lifecycle?.poll !== undefined, billed, id);
+        assertEquals(doc.lifecycle?.stop !== undefined, billed, id);
         assertEquals(
             bundle.fnTable[doc.usage.evidence.$fn.key].provenance ===
                 "core#usage.synthesizedEmpty",
